@@ -1,5 +1,5 @@
 streamlit
-huggingface_hub
+huggingface_hub>=0.22.0
 python-docx
 reportlab
 PyPDF2
