@@ -5,15 +5,20 @@ from PyPDF2 import PdfReader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from huggingface_hub import InferenceClient
+import traceback
+
+DEBUG = True  # Set False for production
 
 # ----------------------------
-# 🧠 Hugging Face Model Setup
+# 🧠 Hugging Face Model Setup with Auto Fallback
 # ----------------------------
-# 🧠 Hugging Face Model Setup (using smaller free model)
-client = InferenceClient(
-    "google/flan-t5-large",
-    token=st.secrets["HUGGINGFACE_API_TOKEN"]
-)
+try:
+    client = InferenceClient("tiiuae/falcon-7b-instruct", token=st.secrets["HUGGINGFACE_API_TOKEN"])
+    # quick test ping
+    client.text_generation("Hello", max_new_tokens=1)
+except Exception:
+    st.warning("⚠️ Falcon-7B model not available — switching to Flan-T5 (faster free model).")
+    client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
 
 # ----------------------------
 # 🎨 Streamlit Page Setup
@@ -22,16 +27,14 @@ st.set_page_config(page_title="ResumeCopilot 🇮🇳", page_icon="📄", layout
 
 st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder 🇮🇳")
 st.write("Create or update your **ATS-friendly resume & cover letter** instantly using free AI from Hugging Face.")
-
 st.markdown("---")
 
 # ----------------------------
-# 🧾 User Information Section
+# 🧾 Candidate Information
 # ----------------------------
 st.subheader("🧾 Candidate Details")
 
 col1, col2 = st.columns(2)
-
 with col1:
     full_name = st.text_input("👤 Full Name")
     email = st.text_input("📧 Email Address")
@@ -50,9 +53,9 @@ job_description = st.text_area("📋 Job Description (optional)", placeholder="P
 st.markdown("---")
 
 # ----------------------------
-# 📤 Upload Old Resume
+# 📤 Upload Old Resume (optional)
 # ----------------------------
-st.subheader("📤 Upload Your Old Resume (optional)")
+st.subheader("📤 Upload Your Old Resume")
 uploaded_file = st.file_uploader("Upload your past resume (PDF or DOCX)", type=["pdf", "docx"])
 past_resume_text = ""
 
@@ -70,16 +73,15 @@ if uploaded_file is not None:
 st.markdown("---")
 
 # ----------------------------
-# 🚀 Generate Resume Button
+# 🚀 Generate Resume & Cover Letter
 # ----------------------------
 if st.button("🚀 Generate New Resume & Cover Letter"):
     with st.spinner("Creating your new AI-optimized resume... please wait ⏳"):
 
-        # Build prompt dynamically
         prompt = f"""
-        You are ResumeCopilot, an AI assistant that creates modern, ATS-friendly resumes and cover letters.
+        You are ResumeCopilot, an AI that creates modern, ATS-friendly resumes and cover letters.
 
-        The candidate provided the following details:
+        Candidate Details:
         - Full Name: {full_name}
         - Email: {email}
         - Phone: {phone}
@@ -92,29 +94,40 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
 
         Job Description (optional): {job_description}
 
-        Past Resume (if uploaded): {past_resume_text}
+        Past Resume (if any): {past_resume_text}
 
-        Your task:
-        1. Rewrite the resume with strong action verbs and quantifiable achievements.
-        2. Align it to the given job description (if provided).
-        3. Create a professional summary and tailored cover letter.
-        4. Format output with clear sections (Summary, Experience, Education, Skills, Achievements, Cover Letter).
-        5. Keep it concise, clean, and ATS-friendly.
+        Task:
+        1. Write a strong, ATS-friendly resume tailored to the job description.
+        2. Include clear sections: Summary, Experience, Education, Skills, Achievements, and a Cover Letter.
+        3. Use professional tone, bullet points, and concise language.
         """
 
         try:
             # ----------------------------
             # 🧠 Generate AI Output
             # ----------------------------
-            response = client.text_generation(
-                prompt,
-                max_new_tokens=800,
-                temperature=0.7,
-                top_p=0.9
-            )
+            try:
+                response = client.text_generation(
+                    prompt,
+                    max_new_tokens=800,
+                    temperature=0.7,
+                    top_p=0.9
+                )
+                result = response
+            except Exception:
+                st.warning("⚠️ Primary model failed. Retrying with Flan-T5-Large (lightweight fallback).")
+                fallback_client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
+                response = fallback_client.text_generation(
+                    prompt,
+                    max_new_tokens=700,
+                    temperature=0.7,
+                    top_p=0.9
+                )
+                result = response
 
-            result = response
-
+            # ----------------------------
+            # ✅ Display Output
+            # ----------------------------
             st.success("✅ Resume & Cover Letter Generated Successfully!")
 
             with st.expander("📋 Preview Resume & Cover Letter", expanded=True):
@@ -128,7 +141,7 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
                 )
 
             # ----------------------------
-            # 💾 Downloadable Files
+            # 💾 Create Downloadable Files
             # ----------------------------
             text_bytes = result.encode('utf-8')
 
@@ -161,7 +174,24 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
             st.download_button("📕 Download as PDF", data=pdf_buffer, file_name="ResumeCopilot.pdf")
 
         except Exception as e:
-            st.error(f"⚠️ Error: {e}")
+            st.error("⚠️ Something went wrong while generating the resume.")
+            if DEBUG:
+                st.text(traceback.format_exc())
+            st.warning("Retrying with smaller free model...")
+
+            # Retry logic
+            try:
+                fallback_client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
+                response = fallback_client.text_generation(
+                    prompt, max_new_tokens=700, temperature=0.7, top_p=0.9
+                )
+                result = response
+                st.success("✅ Successfully recovered with Flan-T5 model.")
+                st.write(result)
+            except Exception as inner_e:
+                st.error("❌ ResumeCopilot could not recover. Please try again later.")
+                if DEBUG:
+                    st.text(traceback.format_exc())
 
 st.markdown("---")
 st.caption("✨ Built with ❤️ in India | ResumeCopilot.ai (Free Hugging Face Edition)")
