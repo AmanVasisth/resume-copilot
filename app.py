@@ -7,30 +7,36 @@ from reportlab.pdfgen import canvas
 from huggingface_hub import InferenceClient
 import traceback
 
-DEBUG = True  # Set False for production
+DEBUG = True  # Turn False before public deployment
 
 # ----------------------------
-# 🧠 Hugging Face Model Setup with Auto Fallback
+# 🧠 Model Setup with Auto Fallback
 # ----------------------------
+def get_hf_client(model_name):
+    return InferenceClient(model_name, token=st.secrets["HUGGINGFACE_API_TOKEN"])
+
+# Primary model (Falcon)
 try:
-    client = InferenceClient("tiiuae/falcon-7b-instruct", token=st.secrets["HUGGINGFACE_API_TOKEN"])
-    # quick test ping
+    client = get_hf_client("tiiuae/falcon-7b-instruct")
     client.text_generation("Hello", max_new_tokens=1)
+    MODEL_TYPE = "text-generation"
+    CURRENT_MODEL = "Falcon-7B"
 except Exception:
-    st.warning("⚠️ Falcon-7B model not available — switching to Flan-T5 (faster free model).")
-    client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
+    st.warning("⚠️ Falcon-7B unavailable — switching to Flan-T5 (free fallback).")
+    client = get_hf_client("google/flan-t5-large")
+    MODEL_TYPE = "text2text-generation"
+    CURRENT_MODEL = "Flan-T5"
 
 # ----------------------------
 # 🎨 Streamlit Page Setup
 # ----------------------------
 st.set_page_config(page_title="ResumeCopilot 🇮🇳", page_icon="📄", layout="wide")
-
 st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder 🇮🇳")
-st.write("Create or update your **ATS-friendly resume & cover letter** instantly using free AI from Hugging Face.")
+st.write("Create or update your **ATS-friendly resume & cover letter** instantly using Hugging Face models.")
 st.markdown("---")
 
 # ----------------------------
-# 🧾 Candidate Information
+# 🧾 Candidate Details
 # ----------------------------
 st.subheader("🧾 Candidate Details")
 
@@ -53,18 +59,18 @@ job_description = st.text_area("📋 Job Description (optional)", placeholder="P
 st.markdown("---")
 
 # ----------------------------
-# 📤 Upload Old Resume (optional)
+# 📤 Upload Old Resume
 # ----------------------------
-st.subheader("📤 Upload Your Old Resume")
-uploaded_file = st.file_uploader("Upload your past resume (PDF or DOCX)", type=["pdf", "docx"])
+st.subheader("📤 Upload Your Old Resume (optional)")
+uploaded_file = st.file_uploader("Upload your previous resume (PDF or DOCX)", type=["pdf", "docx"])
 past_resume_text = ""
 
-if uploaded_file is not None:
+if uploaded_file:
     if uploaded_file.type == "application/pdf":
-        pdf_reader = PdfReader(uploaded_file)
-        for page in pdf_reader.pages:
+        reader = PdfReader(uploaded_file)
+        for page in reader.pages:
             past_resume_text += page.extract_text() + "\n"
-    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    else:
         doc = Document(uploaded_file)
         for para in doc.paragraphs:
             past_resume_text += para.text + "\n"
@@ -77,121 +83,103 @@ st.markdown("---")
 # ----------------------------
 if st.button("🚀 Generate New Resume & Cover Letter"):
     with st.spinner("Creating your new AI-optimized resume... please wait ⏳"):
-
         prompt = f"""
-        You are ResumeCopilot, an AI that creates modern, ATS-friendly resumes and cover letters.
+        You are ResumeCopilot, an AI resume and cover letter expert.
 
         Candidate Details:
-        - Full Name: {full_name}
-        - Email: {email}
-        - Phone: {phone}
-        - LinkedIn: {linkedin}
-        - Job Title: {job_title}
-        - Experience: {experience} years
-        - Skills: {skills}
-        - Education: {education}
-        - Achievements: {achievements}
+        Name: {full_name}
+        Email: {email}
+        Phone: {phone}
+        LinkedIn: {linkedin}
+        Job Title: {job_title}
+        Experience: {experience} years
+        Skills: {skills}
+        Education: {education}
+        Achievements: {achievements}
 
-        Job Description (optional): {job_description}
+        Job Description: {job_description}
 
         Past Resume (if any): {past_resume_text}
 
         Task:
-        1. Write a strong, ATS-friendly resume tailored to the job description.
-        2. Include clear sections: Summary, Experience, Education, Skills, Achievements, and a Cover Letter.
-        3. Use professional tone, bullet points, and concise language.
+        1. Create a new, modern, ATS-friendly resume.
+        2. Include Summary, Experience, Education, Skills, Achievements.
+        3. Write a short professional cover letter at the end.
         """
 
         try:
-            # ----------------------------
-            # 🧠 Generate AI Output
-            # ----------------------------
+            # ---------- MAIN MODEL ----------
+            if MODEL_TYPE == "text-generation":
+                response = client.text_generation(prompt, max_new_tokens=800, temperature=0.7, top_p=0.9)
+                result = response
+            else:
+                response = client.text2text_generation(prompt)
+                result = response[0]["generated_text"] if isinstance(response, list) else response
+
+        except Exception as e1:
+            st.warning("⚠️ Primary model failed. Retrying with Flan-T5 (text2text-generation)...")
             try:
-                response = client.text_generation(
-                    prompt,
-                    max_new_tokens=800,
-                    temperature=0.7,
-                    top_p=0.9
-                )
+                flan_client = get_hf_client("google/flan-t5-large")
+                response = flan_client.text2text_generation(prompt)
+                result = response[0]["generated_text"] if isinstance(response, list) else response
+                CURRENT_MODEL = "Flan-T5"
+            except Exception as e2:
+                st.warning("⚠️ Flan-T5 failed. Retrying with Mistral-7B (text-generation)...")
+                mistral_client = get_hf_client("mistralai/Mistral-7B-v0.1")
+                response = mistral_client.text_generation(prompt, max_new_tokens=700)
                 result = response
-            except Exception:
-                st.warning("⚠️ Primary model failed. Retrying with Flan-T5-Large (lightweight fallback).")
-                fallback_client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
-                response = fallback_client.text_generation(
-                    prompt,
-                    max_new_tokens=700,
-                    temperature=0.7,
-                    top_p=0.9
-                )
-                result = response
+                CURRENT_MODEL = "Mistral-7B"
 
-            # ----------------------------
-            # ✅ Display Output
-            # ----------------------------
-            st.success("✅ Resume & Cover Letter Generated Successfully!")
+        # ----------------------------
+        # ✅ Display Output
+        # ----------------------------
+        st.success(f"✅ Resume & Cover Letter Generated Successfully! (Model Used: {CURRENT_MODEL})")
 
-            with st.expander("📋 Preview Resume & Cover Letter", expanded=True):
-                st.markdown(
-                    f"""
-                    <div style='background-color:#f9f9f9; padding:20px; border-radius:10px; line-height:1.6;'>
-                    <pre style='white-space:pre-wrap; font-family:Roboto, sans-serif; color:#333;'>{result}</pre>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+        with st.expander("📋 Preview Resume & Cover Letter", expanded=True):
+            st.markdown(
+                f"""
+                <div style='background-color:#f9f9f9; padding:20px; border-radius:10px; line-height:1.6;'>
+                <pre style='white-space:pre-wrap; font-family:Roboto, sans-serif; color:#333;'>{result}</pre>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-            # ----------------------------
-            # 💾 Create Downloadable Files
-            # ----------------------------
-            text_bytes = result.encode('utf-8')
+        # ----------------------------
+        # 💾 Download Options
+        # ----------------------------
+        text_bytes = result.encode("utf-8")
 
-            # Word File
-            docx_buffer = BytesIO()
-            doc = Document()
-            doc.add_heading("Resume & Cover Letter", 0)
-            for line in result.split("\n"):
-                doc.add_paragraph(line)
-            doc.save(docx_buffer)
-            docx_buffer.seek(0)
+        # Word File
+        docx_buffer = BytesIO()
+        doc = Document()
+        doc.add_heading("Resume & Cover Letter", 0)
+        for line in result.split("\n"):
+            doc.add_paragraph(line)
+        doc.save(docx_buffer)
+        docx_buffer.seek(0)
 
-            # PDF File
-            pdf_buffer = BytesIO()
-            pdf = canvas.Canvas(pdf_buffer, pagesize=letter)
-            width, height = letter
-            y = height - 50
-            for line in result.split("\n"):
-                pdf.drawString(50, y, line)
-                y -= 15
-                if y < 50:
-                    pdf.showPage()
-                    y = height - 50
-            pdf.save()
-            pdf_buffer.seek(0)
+        # PDF File
+        pdf_buffer = BytesIO()
+        pdf = canvas.Canvas(pdf_buffer, pagesize=letter)
+        width, height = letter
+        y = height - 50
+        for line in result.split("\n"):
+            pdf.drawString(50, y, line)
+            y -= 15
+            if y < 50:
+                pdf.showPage()
+                y = height - 50
+        pdf.save()
+        pdf_buffer.seek(0)
 
-            # Download buttons
-            st.download_button("📄 Download as Text", data=text_bytes, file_name="ResumeCopilot.txt")
-            st.download_button("📝 Download as Word (.docx)", data=docx_buffer, file_name="ResumeCopilot.docx")
-            st.download_button("📕 Download as PDF", data=pdf_buffer, file_name="ResumeCopilot.pdf")
+        st.download_button("📄 Download as Text", data=text_bytes, file_name="ResumeCopilot.txt")
+        st.download_button("📝 Download as Word (.docx)", data=docx_buffer, file_name="ResumeCopilot.docx")
+        st.download_button("📕 Download as PDF", data=pdf_buffer, file_name="ResumeCopilot.pdf")
 
-        except Exception as e:
-            st.error("⚠️ Something went wrong while generating the resume.")
-            if DEBUG:
-                st.text(traceback.format_exc())
-            st.warning("Retrying with smaller free model...")
+        if DEBUG:
+            st.info(f"Model Used → {CURRENT_MODEL}")
 
-            # Retry logic
-            try:
-                fallback_client = InferenceClient("google/flan-t5-large", token=st.secrets["HUGGINGFACE_API_TOKEN"])
-                response = fallback_client.text_generation(
-                    prompt, max_new_tokens=700, temperature=0.7, top_p=0.9
-                )
-                result = response
-                st.success("✅ Successfully recovered with Flan-T5 model.")
-                st.write(result)
-            except Exception as inner_e:
-                st.error("❌ ResumeCopilot could not recover. Please try again later.")
-                if DEBUG:
-                    st.text(traceback.format_exc())
+    st.markdown("---")
 
-st.markdown("---")
 st.caption("✨ Built with ❤️ in India | ResumeCopilot.ai (Free Hugging Face Edition)")
