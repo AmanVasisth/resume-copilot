@@ -4,34 +4,40 @@ from docx import Document
 from PyPDF2 import PdfReader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from huggingface_hub import InferenceApi
+from huggingface_hub import InferenceClient
 
-# ---- Initialize Hugging Face API ----
-hf_api = InferenceApi(
-    repo_id="tiiuae/falcon-7b-instruct",  # Free and reliable model
+# ----------------------------
+# 🧠 Hugging Face Model Setup
+# ----------------------------
+client = InferenceClient(
+    "tiiuae/falcon-7b-instruct",  # ✅ Free model for text generation
     token=st.secrets["HUGGINGFACE_API_TOKEN"]
 )
 
-# ---- Streamlit Page Config ----
+# ----------------------------
+# 🎨 Streamlit Page Setup
+# ----------------------------
 st.set_page_config(page_title="ResumeCopilot 🇮🇳", page_icon="📄", layout="wide")
 
-st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder ")
-st.write("Create or update your **ATS-friendly resume and cover letter** instantly using AI (powered by Hugging Face).")
+st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder 🇮🇳")
+st.write("Create or update your **ATS-friendly resume & cover letter** instantly using free AI from Hugging Face.")
 
 st.markdown("---")
 
-# ---- User Input Section ----
-st.subheader("🧾 Candidate Information")
+# ----------------------------
+# 🧾 User Information Section
+# ----------------------------
+st.subheader("🧾 Candidate Details")
 
 col1, col2 = st.columns(2)
 
 with col1:
     full_name = st.text_input("👤 Full Name")
     email = st.text_input("📧 Email Address")
-    phone = st.text_input("📞 Contact Number")
+    phone = st.text_input("📞 Phone Number")
 
 with col2:
-    linkedin = st.text_input("🔗 LinkedIn Profile URL (optional)")
+    linkedin = st.text_input("🔗 LinkedIn Profile (optional)")
     job_title = st.text_input("💼 Job Title")
     experience = st.text_input("⏳ Years of Experience")
 
@@ -42,8 +48,10 @@ job_description = st.text_area("📋 Job Description (optional)", placeholder="P
 
 st.markdown("---")
 
-# ---- Upload Past Resume ----
-st.subheader("📤 Upload Your Existing Resume (optional)")
+# ----------------------------
+# 📤 Upload Old Resume
+# ----------------------------
+st.subheader("📤 Upload Your Old Resume (optional)")
 uploaded_file = st.file_uploader("Upload your past resume (PDF or DOCX)", type=["pdf", "docx"])
 past_resume_text = ""
 
@@ -56,19 +64,21 @@ if uploaded_file is not None:
         doc = Document(uploaded_file)
         for para in doc.paragraphs:
             past_resume_text += para.text + "\n"
-    st.success("✅ Resume uploaded and text extracted successfully!")
+    st.success("✅ Resume uploaded successfully!")
 
 st.markdown("---")
 
-# ---- Generate Resume Button ----
+# ----------------------------
+# 🚀 Generate Resume Button
+# ----------------------------
 if st.button("🚀 Generate New Resume & Cover Letter"):
     with st.spinner("Creating your new AI-optimized resume... please wait ⏳"):
 
-        # Build prompt
+        # Build prompt dynamically
         prompt = f"""
         You are ResumeCopilot, an AI assistant that creates modern, ATS-friendly resumes and cover letters.
-        
-        The candidate provided this information:
+
+        The candidate provided the following details:
         - Full Name: {full_name}
         - Email: {email}
         - Phone: {phone}
@@ -81,22 +91,29 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
 
         Job Description (optional): {job_description}
 
-        Past Resume (if any): {past_resume_text}
+        Past Resume (if uploaded): {past_resume_text}
 
-        Please:
-        1. Extract relevant content from the past resume.
-        2. Rewrite and optimize it based on the new job description (if provided).
-        3. Format clearly with sections: Summary, Experience, Education, Skills, Achievements, and Cover Letter.
-        4. Keep tone professional and suitable for Indian job market.
-        5. Output should be easy to copy or download.
+        Your task:
+        1. Rewrite the resume with strong action verbs and quantifiable achievements.
+        2. Align it to the given job description (if provided).
+        3. Create a professional summary and tailored cover letter.
+        4. Format output with clear sections (Summary, Experience, Education, Skills, Achievements, Cover Letter).
+        5. Keep it concise, clean, and ATS-friendly.
         """
 
         try:
-            # Call Hugging Face API
-            response = hf_api(prompt)
-            result = response[0]["generated_text"]
+            # ----------------------------
+            # 🧠 Generate AI Output
+            # ----------------------------
+            response = client.text_generation(
+                prompt,
+                max_new_tokens=800,
+                temperature=0.7,
+                top_p=0.9
+            )
 
-            # Display the output beautifully
+            result = response
+
             st.success("✅ Resume & Cover Letter Generated Successfully!")
 
             with st.expander("📋 Preview Resume & Cover Letter", expanded=True):
@@ -109,7 +126,9 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
                     unsafe_allow_html=True
                 )
 
-            # ---- Create Downloadable Files ----
+            # ----------------------------
+            # 💾 Downloadable Files
+            # ----------------------------
             text_bytes = result.encode('utf-8')
 
             # Word File
@@ -135,7 +154,7 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
             pdf.save()
             pdf_buffer.seek(0)
 
-            # ---- Download Buttons ----
+            # Download buttons
             st.download_button("📄 Download as Text", data=text_bytes, file_name="ResumeCopilot.txt")
             st.download_button("📝 Download as Word (.docx)", data=docx_buffer, file_name="ResumeCopilot.docx")
             st.download_button("📕 Download as PDF", data=pdf_buffer, file_name="ResumeCopilot.pdf")
@@ -144,4 +163,4 @@ if st.button("🚀 Generate New Resume & Cover Letter"):
             st.error(f"⚠️ Error: {e}")
 
 st.markdown("---")
-st.caption("**Built with ❤️ in India | ResumeCopilot.ai (Free Edition - Hugging Face)**")
+st.caption("✨ Built with ❤️ in India | ResumeCopilot.ai (Free Hugging Face Edition)")
