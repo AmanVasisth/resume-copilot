@@ -9,8 +9,9 @@ from huggingface_hub import InferenceClient
 # ----------------------------
 # 🧠 Hugging Face Model Setup
 # ----------------------------
+# 🧠 Hugging Face Model Setup (using smaller free model)
 client = InferenceClient(
-    "tiiuae/falcon-7b-instruct",  # ✅ Free model for text generation
+    "google/flan-t5-large",
     token=st.secrets["HUGGINGFACE_API_TOKEN"]
 )
 
