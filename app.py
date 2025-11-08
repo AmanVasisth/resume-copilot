@@ -4,7 +4,7 @@ from docx import Document
 from PyPDF2 import PdfReader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from huggingface_hub import InferenceClient
+import requests
 import json
 
 # ----------------------------
@@ -12,34 +12,30 @@ import json
 # ----------------------------
 st.set_page_config(page_title="ResumeCopilot 🇮🇳", page_icon="📄", layout="wide")
 st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder 🇮🇳")
-st.write("Create or update your **ATS-friendly resume & cover letter** instantly using Hugging Face free models.")
+st.write("Create or update your **ATS-friendly resume & cover letter** instantly using free Hugging Face models.")
 st.markdown("---")
 
 # ----------------------------
 # ⚙️ Universal Safe Model Caller
 # ----------------------------
 def safe_generate(model_name, prompt):
-    """Universal Hugging Face text generator for all models."""
+    """Universal Hugging Face text generator for free models."""
     try:
-        client = InferenceClient(token=st.secrets["HUGGINGFACE_API_TOKEN"])
-        response = client.post_json(
+        headers = {"Authorization": f"Bearer {st.secrets['HUGGINGFACE_API_TOKEN']}"}
+        response = requests.post(
             f"https://api-inference.huggingface.co/models/{model_name}",
-            {
-                "inputs": prompt,
-                "parameters": {
-                    "max_new_tokens": 700,
-                    "temperature": 0.7,
-                    "top_p": 0.9
-                }
-            },
+            headers=headers,
+            json={"inputs": prompt, "parameters": {"max_new_tokens": 500, "temperature": 0.7}},
+            timeout=60
         )
-        # Handle both list and dict responses
-        if isinstance(response, list) and len(response) > 0:
-            return response[0].get("generated_text", str(response))
-        elif isinstance(response, dict):
-            return response.get("generated_text", str(response))
+        result = response.json()
+
+        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
+            return result[0]["generated_text"]
+        elif isinstance(result, dict) and "error" in result:
+            raise RuntimeError(result["error"])
         else:
-            return str(response)
+            return str(result)
     except Exception as e:
         raise RuntimeError(f"Model {model_name} failed: {str(e)}")
 
@@ -117,19 +113,22 @@ if st.button("🚀 Generate Resume & Cover Letter"):
         4. Keep tone professional and optimized for Indian recruiters.
         """
 
+        # ----------------------------
+        # 🧠 Free-Friendly Model Fallback Chain
+        # ----------------------------
         try:
-            st.info("🦅 Using Falcon-7B model...")
-            result = safe_generate("tiiuae/falcon-7b-instruct", prompt)
-            CURRENT_MODEL = "Falcon-7B"
+            st.info("🦜 Using DistilGPT2 (fast & free model)...")
+            result = safe_generate("distilgpt2", prompt)
+            CURRENT_MODEL = "DistilGPT2"
         except Exception:
-            st.warning("⚠️ Falcon-7B failed. Retrying with Flan-T5...")
+            st.warning("⚠️ DistilGPT2 failed. Retrying with Flan-T5-Small...")
             try:
-                result = safe_generate("google/flan-t5-large", prompt)
-                CURRENT_MODEL = "Flan-T5"
+                result = safe_generate("google/flan-t5-small", prompt)
+                CURRENT_MODEL = "Flan-T5-Small"
             except Exception:
-                st.warning("⚠️ Flan-T5 failed. Retrying with Mistral-7B...")
-                result = safe_generate("mistralai/Mistral-7B-v0.1", prompt)
-                CURRENT_MODEL = "Mistral-7B"
+                st.warning("⚠️ Flan-T5-Small failed. Retrying with GPT2...")
+                result = safe_generate("gpt2", prompt)
+                CURRENT_MODEL = "GPT2"
 
         # ----------------------------
         # ✅ Display Result
