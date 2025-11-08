@@ -1,23 +1,26 @@
 import streamlit as st
-from openai import OpenAI
 from io import BytesIO
 from docx import Document
+from PyPDF2 import PdfReader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from huggingface_hub import InferenceApi
 
-# Initialize OpenAI client
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# ---- Initialize Hugging Face API ----
+hf_api = InferenceApi(
+    repo_id="tiiuae/falcon-7b-instruct",  # Free and reliable model
+    token=st.secrets["HUGGINGFACE_API_TOKEN"]
+)
 
-# App configuration
+# ---- Streamlit Page Config ----
 st.set_page_config(page_title="ResumeCopilot 🇮🇳", page_icon="📄", layout="wide")
 
-# Title & Description
-st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder 🇮🇳")
-st.write("Create **professional, ATS-friendly** resumes & cover letters instantly with AI – customized for the Indian job market 🇮🇳.")
+st.title("📄 ResumeCopilot – AI Resume & Cover Letter Builder ")
+st.write("Create or update your **ATS-friendly resume and cover letter** instantly using AI (powered by Hugging Face).")
 
 st.markdown("---")
 
-# --- USER INPUT FORM ---
+# ---- User Input Section ----
 st.subheader("🧾 Candidate Information")
 
 col1, col2 = st.columns(2)
@@ -39,16 +42,33 @@ job_description = st.text_area("📋 Job Description (optional)", placeholder="P
 
 st.markdown("---")
 
-# --- GENERATE RESUME ---
-if st.button("🚀 Generate Resume & Cover Letter"):
-    with st.spinner("Creating your personalized resume... please wait ⏳"):
+# ---- Upload Past Resume ----
+st.subheader("📤 Upload Your Existing Resume (optional)")
+uploaded_file = st.file_uploader("Upload your past resume (PDF or DOCX)", type=["pdf", "docx"])
+past_resume_text = ""
 
-        # Prompt for OpenAI
+if uploaded_file is not None:
+    if uploaded_file.type == "application/pdf":
+        pdf_reader = PdfReader(uploaded_file)
+        for page in pdf_reader.pages:
+            past_resume_text += page.extract_text() + "\n"
+    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        doc = Document(uploaded_file)
+        for para in doc.paragraphs:
+            past_resume_text += para.text + "\n"
+    st.success("✅ Resume uploaded and text extracted successfully!")
+
+st.markdown("---")
+
+# ---- Generate Resume Button ----
+if st.button("🚀 Generate New Resume & Cover Letter"):
+    with st.spinner("Creating your new AI-optimized resume... please wait ⏳"):
+
+        # Build prompt
         prompt = f"""
-        You are ResumeCopilot, an AI assistant that builds modern, ATS-optimized resumes and cover letters.
-        Generate a professional resume and cover letter for the following candidate:
+        You are ResumeCopilot, an AI assistant that creates modern, ATS-friendly resumes and cover letters.
         
-        Candidate Details:
+        The candidate provided this information:
         - Full Name: {full_name}
         - Email: {email}
         - Phone: {phone}
@@ -58,25 +78,25 @@ if st.button("🚀 Generate Resume & Cover Letter"):
         - Skills: {skills}
         - Education: {education}
         - Achievements: {achievements}
-        
+
         Job Description (optional): {job_description}
 
+        Past Resume (if any): {past_resume_text}
+
         Please:
-        1. Tailor the resume to the job description if provided.
-        2. Format clearly with sections: Summary, Experience, Education, Skills, Achievements, Cover Letter.
-        3. Keep tone professional and suitable for Indian job market.
-        4. Use clean bullet points and concise wording.
+        1. Extract relevant content from the past resume.
+        2. Rewrite and optimize it based on the new job description (if provided).
+        3. Format clearly with sections: Summary, Experience, Education, Skills, Achievements, and Cover Letter.
+        4. Keep tone professional and suitable for Indian job market.
+        5. Output should be easy to copy or download.
         """
 
         try:
-            # Generate Resume
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            result = response.choices[0].message.content.strip()
+            # Call Hugging Face API
+            response = hf_api(prompt)
+            result = response[0]["generated_text"]
 
-            # Display Preview in Card
+            # Display the output beautifully
             st.success("✅ Resume & Cover Letter Generated Successfully!")
 
             with st.expander("📋 Preview Resume & Cover Letter", expanded=True):
@@ -89,7 +109,7 @@ if st.button("🚀 Generate Resume & Cover Letter"):
                     unsafe_allow_html=True
                 )
 
-            # --- File Downloads ---
+            # ---- Create Downloadable Files ----
             text_bytes = result.encode('utf-8')
 
             # Word File
@@ -115,7 +135,7 @@ if st.button("🚀 Generate Resume & Cover Letter"):
             pdf.save()
             pdf_buffer.seek(0)
 
-            # --- Download Buttons ---
+            # ---- Download Buttons ----
             st.download_button("📄 Download as Text", data=text_bytes, file_name="ResumeCopilot.txt")
             st.download_button("📝 Download as Word (.docx)", data=docx_buffer, file_name="ResumeCopilot.docx")
             st.download_button("📕 Download as PDF", data=pdf_buffer, file_name="ResumeCopilot.pdf")
@@ -124,4 +144,4 @@ if st.button("🚀 Generate Resume & Cover Letter"):
             st.error(f"⚠️ Error: {e}")
 
 st.markdown("---")
-st.caption("**Built with ❤️ in India | ResumeCopilot.ai (Free Edition)**")
+st.caption("**Built with ❤️ in India | ResumeCopilot.ai (Free Edition - Hugging Face)**")
