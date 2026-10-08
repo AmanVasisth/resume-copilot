@@ -1,14 +1,23 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse
 from .engine import build_profile, make_questions, evaluate_answer
 from .llm import evaluate_with_llm
 from .adaptive import InterviewState, select_next_question, readiness_report
 
-app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.0")
+app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.1")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
-    return {"status":"ok","service":"careercoach-interview-engine","version":"0.4.0"}
+    return {"status":"ok","service":"careercoach-interview-engine","version":"0.4.1"}
 
 @app.post("/v1/interview/plan", response_model=InterviewPlan)
 def create_plan(req: InterviewRequest):
