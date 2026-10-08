@@ -49,3 +49,16 @@ class AnswerEvaluation(BaseModel):
     weaknesses: list[str]
     follow_up_question: str | None = None
     next_focus: str
+
+class NextQuestionRequest(BaseModel):
+    candidate: CandidateProfile
+    available_questions: list[Question]
+    asked_questions: list[Question] = []
+    evaluations: list[AnswerEvaluation] = []
+    last_question: Question
+    last_evaluation: AnswerEvaluation
+
+class NextQuestionResponse(BaseModel):
+    question: Question | None
+    interview_complete: bool
+    readiness: dict
