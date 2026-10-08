@@ -27,7 +27,7 @@ class Question(BaseModel):
     difficulty: Difficulty
     question: str
     rationale: str
-    source: Literal["resume","job_description","role_map","memory"]
+    source: Literal["resume","job_description","role_map","memory","adaptive"]
 
 class InterviewPlan(BaseModel):
     profile: CandidateProfile
