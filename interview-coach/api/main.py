@@ -5,7 +5,7 @@ from .engine import build_profile, make_questions, evaluate_answer
 from .llm import evaluate_with_llm
 from .adaptive import InterviewState, select_next_question, readiness_report
 
-app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.1")
+app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,7 +17,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status":"ok","service":"careercoach-interview-engine","version":"0.4.1"}
+    return {"status":"ok","service":"careercoach-interview-engine","version":"0.4.2"}
 
 @app.post("/v1/interview/plan", response_model=InterviewPlan)
 def create_plan(req: InterviewRequest):
@@ -27,9 +27,16 @@ def create_plan(req: InterviewRequest):
 @app.post("/v1/interview/evaluate", response_model=AnswerEvaluation)
 def evaluate(req: EvaluateAnswerRequest):
     llm_result=evaluate_with_llm(req.question, req.answer, req.candidate)
-    if llm_result:
-        return AnswerEvaluation.model_validate(llm_result)
-    return evaluate_answer(req.question, req.answer, req.candidate)
+    result = (
+        AnswerEvaluation.model_validate(llm_result)
+        if llm_result
+        else evaluate_answer(req.question, req.answer, req.candidate)
+    )
+    # An adaptive probe is intentionally one level deep. Do not generate
+    # another copy of the same generic follow-up after the probe is answered.
+    if req.question.id.startswith("followup-"):
+        result.follow_up_question = None
+    return result
 
 @app.post("/v1/interview/next", response_model=NextQuestionResponse)
 def next_question(req: NextQuestionRequest):
