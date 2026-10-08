@@ -1,6 +1,9 @@
 import os
 import json
 from typing import Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SYSTEM = """You are CareerCoach AI, an expert interviewer for professional data, BI, software and AI roles.
 Evaluate answers like a demanding but fair senior interviewer. Do not reward keyword stuffing.
