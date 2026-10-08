@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
 from .engine import build_profile, make_questions, evaluate_answer
 from .llm import evaluate_with_llm
 from .adaptive import InterviewState, select_next_question, readiness_report
+from .resume_parser import extract_resume_text
 
 app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.3")
 
@@ -18,6 +19,17 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status":"ok","service":"careercoach-interview-engine","version":"0.4.3"}
+
+@app.post("/v1/resume/extract")
+async def extract_resume(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        text = extract_resume_text(file.filename or "", content)
+        if not text:
+            raise ValueError("No readable text found in the uploaded resume.")
+        return {"filename": file.filename, "text": text}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 @app.post("/v1/interview/plan", response_model=InterviewPlan)
 def create_plan(req: InterviewRequest):
