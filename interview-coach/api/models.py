@@ -11,6 +11,7 @@ class CandidateProfile(BaseModel):
     projects: list[str] = []
     claims: list[str] = []
     required_skills: list[str] = []
+    skill_evidence: dict[str, list[str]] = {}
 
 class InterviewRequest(BaseModel):
     resume_text: str = ""
