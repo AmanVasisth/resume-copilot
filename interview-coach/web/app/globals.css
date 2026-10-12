@@ -43,3 +43,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .feedback-actions>button:first-child{background:#111827}
 .feedback-actions .finish-button{background:#fff;color:#344054;border:1px solid #d0d5dd}
 @media(max-width:700px){.feedback-actions{grid-template-columns:1fr}}
+
+.history-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.session-detail{margin-top:18px;padding:18px;border:1px solid #d9d6fe;background:#fcfbff;border-radius:15px}
+.session-detail>p{color:var(--muted);font-size:13px}
+.answer-detail{padding:15px 0;border-top:1px solid var(--line)}
+.answer-detail p{font-size:13px;line-height:1.6;color:#475467;margin:8px 0;overflow-wrap:anywhere}
+.answer-detail>b{line-height:1.5}
+.session-detail>button{margin-top:12px;background:var(--brand)}
