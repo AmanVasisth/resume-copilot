@@ -38,3 +38,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .history-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
 .history-item p{font-size:12px;color:var(--muted);margin:5px 0 0}.history-item strong{font-size:20px}
 @media(max-width:700px){.header-actions{align-items:flex-end;flex-direction:column;gap:8px}.history-panel{margin:-20px 0 22px}}
+
+.feedback-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.feedback-actions>button:first-child{background:#111827}
+.feedback-actions .finish-button{background:#fff;color:#344054;border:1px solid #d0d5dd}
+@media(max-width:700px){.feedback-actions{grid-template-columns:1fr}}
