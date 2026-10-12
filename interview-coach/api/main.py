@@ -5,6 +5,7 @@ from .engine import build_profile, make_questions, evaluate_answer
 from .llm import evaluate_with_llm
 from .adaptive import InterviewState, select_next_question, readiness_report
 from .resume_parser import extract_resume_text
+from . import database
 
 app = FastAPI(title="CareerCoach AI Interview Engine", version="0.4.3")
 
@@ -15,6 +16,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def startup():
+    database.init_db()
 
 @app.get("/health")
 def health():
@@ -35,6 +40,45 @@ async def extract_resume(file: UploadFile = File(...)):
 def create_plan(req: InterviewRequest):
     profile=build_profile(req)
     return InterviewPlan(profile=profile, questions=make_questions(profile, req.question_count, req.mode))
+
+@app.post("/v1/sessions")
+def start_session(payload: dict):
+    key = str(payload.get("candidate_key", "")).strip()
+    role = str(payload.get("target_role", "")).strip()
+    if not key or not role:
+        raise HTTPException(status_code=400, detail="candidate_key and target_role are required.")
+    try:
+        return database.create_session(key, role, float(payload.get("years_experience", 0)), str(payload.get("mode", "mixed")))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@app.get("/v1/sessions")
+def sessions(candidate_key: str, limit: int = 25):
+    return {"sessions": database.list_sessions(candidate_key, limit)}
+
+@app.get("/v1/sessions/{session_id}")
+def session_detail(session_id: int, candidate_key: str):
+    try:
+        return database.get_session(session_id, candidate_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+@app.post("/v1/sessions/{session_id}/answers")
+def save_session_answer(session_id: int, payload: dict):
+    try:
+        return database.save_answer(
+            session_id, str(payload.get("candidate_key", "")),
+            payload["question"], str(payload.get("answer", "")), payload["evaluation"]
+        )
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@app.post("/v1/sessions/{session_id}/complete")
+def complete_session(session_id: int, payload: dict):
+    try:
+        return database.complete_session(session_id, str(payload.get("candidate_key", "")), int(payload["overall_score"]))
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 @app.post("/v1/interview/evaluate", response_model=AnswerEvaluation)
 def evaluate(req: EvaluateAnswerRequest):
