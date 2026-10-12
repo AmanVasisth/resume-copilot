@@ -84,7 +84,7 @@ def make_questions(profile: CandidateProfile, count: int, mode: str) -> list[Que
                 skill=skill,
                 difficulty=diff,
                 source="job_description",
-                question=f"You list {skill} experience in your resume, including: "{snippet}". Walk me through what you personally built, the design decision you made, the hardest issue you faced, and how you validated the result.",
+                question=f'You list {skill} experience in your resume, including: "{snippet}". Walk me through what you personally built, the design decision you made, the hardest issue you faced, and how you validated the result.',
                 rationale=f"JD requirement + resume evidence: tests real hands-on depth in {skill}.",
             ))
         else:
