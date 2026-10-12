@@ -22,7 +22,8 @@ def init_db():
             overall_score INTEGER,
             status TEXT NOT NULL DEFAULT 'in_progress',
             created_at TEXT NOT NULL,
-            completed_at TEXT
+            completed_at TEXT,
+            plan_json TEXT
         )""")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS answers (
@@ -37,16 +38,19 @@ def init_db():
             evaluation_json TEXT NOT NULL,
             created_at TEXT NOT NULL
         )""")
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+        if "plan_json" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN plan_json TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_candidate_date ON sessions(candidate_key, created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_answers_session ON answers(session_id, id)")
         conn.commit()
 
-def create_session(candidate_key: str, target_role: str, years_experience: float, mode: str) -> dict:
+def create_session(candidate_key: str, target_role: str, years_experience: float, mode: str, plan: dict | None = None) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
         cur = conn.execute(
-            "INSERT INTO sessions(candidate_key,target_role,years_experience,mode,created_at) VALUES(?,?,?,?,?)",
-            (candidate_key, target_role, years_experience, mode, now),
+            "INSERT INTO sessions(candidate_key,target_role,years_experience,mode,created_at,plan_json) VALUES(?,?,?,?,?,?)",
+            (candidate_key, target_role, years_experience, mode, now, json.dumps(plan) if plan else None),
         )
         conn.commit()
         return get_session(int(cur.lastrowid), candidate_key)
@@ -83,6 +87,7 @@ def get_session(session_id: int, candidate_key: str) -> dict:
         if not row:
             raise ValueError("Interview session not found for this candidate.")
         session = dict(row)
+        session["plan"] = json.loads(session.pop("plan_json")) if session.get("plan_json") else None
         rows = conn.execute("SELECT * FROM answers WHERE session_id=? ORDER BY id", (session_id,)).fetchall()
         session["answers"] = []
         for item in rows:
