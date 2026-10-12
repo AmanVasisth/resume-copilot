@@ -48,7 +48,7 @@ def start_session(payload: dict):
     if not key or not role:
         raise HTTPException(status_code=400, detail="candidate_key and target_role are required.")
     try:
-        return database.create_session(key, role, float(payload.get("years_experience", 0)), str(payload.get("mode", "mixed")))
+        return database.create_session(key, role, float(payload.get("years_experience", 0)), str(payload.get("mode", "mixed")), payload.get("plan"))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
