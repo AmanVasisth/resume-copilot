@@ -1,9 +1,13 @@
 import os
 import json
+import logging
+from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv
 
-load_dotenv()
+logger = logging.getLogger(__name__)
+# Load the API-local .env reliably, regardless of the directory used to start uvicorn.
+load_dotenv(Path(__file__).with_name(".env"))
 
 SYSTEM = """You are CareerCoach AI, an expert interviewer for professional data, BI, software and AI roles.
 Evaluate answers like a demanding but fair senior interviewer. Do not reward keyword stuffing.
@@ -29,7 +33,8 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
         )
         r.raise_for_status()
         return json.loads(r.json()["choices"][0]["message"]["content"])
-    except Exception:
+    except Exception as exc:
+        logger.warning("LLM evaluation unavailable (%s); using fallback evaluator.", type(exc).__name__)
         return None
 
 def evaluate_with_llm(question, answer, candidate):
