@@ -56,6 +56,10 @@ def start_session(payload: dict):
 def sessions(candidate_key: str, limit: int = 25):
     return {"sessions": database.list_sessions(candidate_key, limit)}
 
+@app.get("/v1/progress")
+def progress(candidate_key: str):
+    return database.progress_summary(candidate_key)
+
 @app.get("/v1/sessions/{session_id}")
 def session_detail(session_id: int, candidate_key: str):
     try:
