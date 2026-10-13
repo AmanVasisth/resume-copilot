@@ -51,3 +51,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .answer-detail p{font-size:13px;line-height:1.6;color:#475467;margin:8px 0;overflow-wrap:anywhere}
 .answer-detail>b{line-height:1.5}
 .session-detail>button{margin-top:12px;background:var(--brand)}
+
+.progress-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0 24px}
+.progress-summary>div{padding:16px;border:1px solid var(--line);border-radius:14px;background:#fbfbff;display:flex;flex-direction:column;gap:8px}
+.progress-summary span{font-size:12px;color:var(--muted)}.progress-summary strong{font-size:25px}
+.skill-list{display:flex;flex-direction:column;gap:14px;margin:14px 0 22px}
+.skill-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.skill-row p{font-size:12px;color:var(--muted);margin:5px 0 0;text-transform:capitalize}
+.skill-score{min-width:125px;text-align:right}.skill-score strong{font-size:20px}.skill-score span{font-size:12px;color:var(--muted);margin-left:3px}
+.skill-track{height:6px;border-radius:999px;background:#e9e7ff;margin-top:8px;overflow:hidden}.skill-track>div{height:100%;border-radius:999px;background:#6558f5}
+@media(max-width:700px){.progress-summary{grid-template-columns:1fr}.skill-row{align-items:flex-start}.skill-score{min-width:90px}}
