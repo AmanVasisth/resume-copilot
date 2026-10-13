@@ -45,9 +45,12 @@ class AnswerEvaluation(BaseModel):
     evaluation_method: Literal["llm_rubric","heuristic_fallback"] = "heuristic_fallback"
     evaluation_provider: Literal["gemini","openrouter","heuristic"] = "heuristic"
     confidence: Literal["high","medium","low"] = "low"
+    relevance: int = Field(default=0, ge=0, le=100)
     technical_correctness: int = Field(ge=0, le=100)
-    depth: int = Field(ge=0, le=100)
+    ownership: int = Field(default=0, ge=0, le=100)
     reasoning: int = Field(ge=0, le=100)
+    validation: int = Field(default=0, ge=0, le=100)
+    depth: int = Field(ge=0, le=100)
     specificity: int = Field(ge=0, le=100)
     communication: int = Field(ge=0, le=100)
     strengths: list[str]
