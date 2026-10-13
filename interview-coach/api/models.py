@@ -14,6 +14,7 @@ class CandidateProfile(BaseModel):
     skill_evidence: dict[str, list[str]] = {}
 
 class InterviewRequest(BaseModel):
+    candidate_key: str | None = None
     resume_text: str = ""
     job_description: str = ""
     target_role: str
