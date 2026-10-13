@@ -61,3 +61,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .skill-score{min-width:125px;text-align:right}.skill-score strong{font-size:20px}.skill-score span{font-size:12px;color:var(--muted);margin-left:3px}
 .skill-track{height:6px;border-radius:999px;background:#e9e7ff;margin-top:8px;overflow:hidden}.skill-track>div{height:100%;border-radius:999px;background:#6558f5}
 @media(max-width:700px){.progress-summary{grid-template-columns:1fr}.skill-row{align-items:flex-start}.skill-score{min-width:90px}}
+
+.practice-head{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.practice-note{color:var(--muted);font-size:13px;line-height:1.5}
+.practice-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.practice-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fcfcff}
+.practice-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.practice-card-top strong{font-size:13px;color:var(--brand)}
+.practice-card p{font-size:13px;line-height:1.55;color:#475467}
+@media(max-width:700px){.practice-list{grid-template-columns:1fr}}
