@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 type Q={id:string;category:string;skill:string;difficulty:string;question:string;rationale:string;source:string};
 type P={target_role:string;years_experience:number;skills:string[];claims:string[];projects:string[];required_skills:string[]};
-type E={score:number;strengths:string[];weaknesses:string[];follow_up_question?:string};
+type E={score:number;strengths:string[];weaknesses:string[];follow_up_question?:string;evaluation_method?:"llm_rubric"|"heuristic_fallback";confidence?:"high"|"medium"|"low"};
 const API=process.env.NEXT_PUBLIC_API_URL||"http://localhost:8000";
 
 export default function Home(){
@@ -89,6 +89,7 @@ export default function Home(){
           ) : (
             <div className="feedback">
               <div className="score">{feedback.score}<small>/100</small></div>
+              <div className="evaluation-note"><b>{feedback.score<20?"Not enough evidence yet":feedback.score<50?"Needs stronger evidence":feedback.score<70?"Developing answer":"Strong answer"}</b><span>{feedback.evaluation_method==="llm_rubric"?"AI rubric evaluation":"Basic relevance/structure check"} · {feedback.confidence==="medium"?"moderate confidence":"low confidence"}</span>{feedback.evaluation_method!=="llm_rubric"&&<p>Detailed technical accuracy is not verified in fallback mode. Add an AI provider key for rubric-based grading.</p>}</div>
               <b>Strengths</b>
               {feedback.strengths.map(x => <p key={x}>✓ {x}</p>)}
               <b>Improve</b>
