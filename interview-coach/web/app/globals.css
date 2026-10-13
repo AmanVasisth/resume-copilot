@@ -104,3 +104,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .detected-skills{margin-top:11px}.detected-skills small{display:block;color:#6d7690;font-size:10px;font-weight:750;margin-bottom:7px}.detected-skills>div{display:flex;flex-wrap:wrap;gap:6px}.detected-skills span{font-size:10px;color:#5146b8;background:#eeecff;border:1px solid #dedaff;border-radius:7px;padding:5px 8px}
 .setup-readiness>p{font-size:11px;line-height:1.55;color:#69738e;margin:12px 0 0}
 @media(max-width:700px){.setup-readiness{padding:13px}.readiness-head{align-items:flex-start}}
+
+
+.evaluation-note{display:flex;flex-direction:column;gap:5px;padding:13px 15px;border:1px solid #e5e7f4;background:#f8f8ff;border-radius:12px}.evaluation-note>b{font-size:13px;color:#262e47}.evaluation-note>span{font-size:11px;color:#6d7690}.evaluation-note>p{font-size:11px;line-height:1.5;color:#8b5e18;margin:3px 0 0}
