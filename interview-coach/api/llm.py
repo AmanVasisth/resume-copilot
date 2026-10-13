@@ -114,14 +114,21 @@ Return JSON with exactly these keys:
 The follow-up must be based on this answer, not a generic template."""
     provider = _provider()
     if provider == "openrouter":
-        return _openrouter(prompt)
+        result = _openrouter(prompt)
+        if result is not None:
+            result["_evaluation_provider"] = "openrouter"
+        return result
     if provider == "gemini":
         result = _gemini(prompt)
         if result is not None:
+            result["_evaluation_provider"] = "gemini"
             return result
         # Optional cross-provider failover when Gemini is unavailable.
         if os.getenv("OPENROUTER_API_KEY"):
             logger.warning("Gemini unavailable; trying OpenRouter fallback.")
-            return _openrouter(prompt)
+            result = _openrouter(prompt)
+            if result is not None:
+                result["_evaluation_provider"] = "openrouter"
+            return result
         return None
     return None
