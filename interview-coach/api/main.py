@@ -102,8 +102,16 @@ def evaluate(req: EvaluateAnswerRequest):
     if short_or_nonanswer:
         result = evaluate_answer(req.question, req.answer, req.candidate)
     else:
-        llm_result=evaluate_with_llm(req.question, req.answer, req.candidate)
-        result = AnswerEvaluation.model_validate(llm_result) if llm_result else evaluate_answer(req.question, req.answer, req.candidate)
+        llm_result = evaluate_with_llm(req.question, req.answer, req.candidate)
+        if llm_result:
+            try:
+                result = AnswerEvaluation.model_validate(llm_result)
+                result.evaluation_method = "llm_rubric"
+                result.confidence = "medium"
+            except Exception:
+                result = evaluate_answer(req.question, req.answer, req.candidate)
+        else:
+            result = evaluate_answer(req.question, req.answer, req.candidate)
     # Adaptive probing is only needed for a weak answer, and only one level deep.
     if req.question.id.startswith("followup-") or result.score >= 65:
         result.follow_up_question = None
