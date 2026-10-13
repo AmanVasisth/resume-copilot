@@ -19,7 +19,9 @@ def _provider():
 
 def _openrouter(prompt: str) -> dict[str, Any] | None:
     key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
+    # OpenRouter uses a separate model setting so it can act as a fallback
+    # even when LLM_MODEL is configured for Gemini.
+    model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
     if not key:
         return None
     try:
@@ -114,5 +116,12 @@ The follow-up must be based on this answer, not a generic template."""
     if provider == "openrouter":
         return _openrouter(prompt)
     if provider == "gemini":
-        return _gemini(prompt)
+        result = _gemini(prompt)
+        if result is not None:
+            return result
+        # Optional cross-provider failover when Gemini is unavailable.
+        if os.getenv("OPENROUTER_API_KEY"):
+            logger.warning("Gemini unavailable; trying OpenRouter fallback.")
+            return _openrouter(prompt)
+        return None
     return None
