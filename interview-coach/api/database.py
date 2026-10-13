@@ -103,3 +103,45 @@ def list_sessions(candidate_key: str, limit: int = 25) -> list[dict]:
             (candidate_key, min(max(limit, 1), 100)),
         ).fetchall()
         return [dict(row) for row in rows]
+
+def progress_summary(candidate_key: str) -> dict:
+    with _connect() as conn:
+        sessions = conn.execute(
+            "SELECT id,target_role,overall_score,status,created_at,completed_at FROM sessions WHERE candidate_key=? ORDER BY created_at",
+            (candidate_key,),
+        ).fetchall()
+        answers = conn.execute(
+            """SELECT a.skill,a.score,a.evaluation_json,a.created_at,s.id AS session_id,s.target_role
+            FROM answers a JOIN sessions s ON s.id=a.session_id
+            WHERE s.candidate_key=? ORDER BY a.created_at""",
+            (candidate_key,),
+        ).fetchall()
+    skill_data = {}
+    for row in answers:
+        skill = (row["skill"] or "General").strip()
+        bucket = skill_data.setdefault(skill, {"scores": [], "sessions": set()})
+        bucket["scores"].append(int(row["score"]))
+        bucket["sessions"].add(int(row["session_id"]))
+    skills = []
+    for skill, bucket in skill_data.items():
+        scores = bucket["scores"]
+        skills.append({
+            "skill": skill,
+            "average_score": round(sum(scores) / len(scores)),
+            "answers_count": len(scores),
+            "sessions_count": len(bucket["sessions"]),
+            "latest_score": scores[-1],
+            "trend": "improving" if len(scores) >= 2 and scores[-1] > scores[0] else ("declining" if len(scores) >= 2 and scores[-1] < scores[0] else "steady"),
+        })
+    skills.sort(key=lambda x: (x["average_score"], x["skill"]))
+    completed = [dict(s) for s in sessions if s["status"] == "completed" and s["overall_score"] is not None]
+    weak = [x["skill"] for x in skills if x["average_score"] < 65][:5]
+    return {
+        "total_sessions": len(sessions),
+        "completed_sessions": len(completed),
+        "answers_count": len(answers),
+        "average_completed_score": round(sum(s["overall_score"] for s in completed) / len(completed)) if completed else None,
+        "sessions": [dict(s) for s in sessions],
+        "skills": skills,
+        "priority_gaps": weak,
+    }
