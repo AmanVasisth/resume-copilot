@@ -42,6 +42,8 @@ class EvaluateAnswerRequest(BaseModel):
 
 class AnswerEvaluation(BaseModel):
     score: int = Field(ge=0, le=100)
+    evaluation_method: Literal["llm_rubric","heuristic_fallback"] = "heuristic_fallback"
+    confidence: Literal["high","medium","low"] = "low"
     technical_correctness: int = Field(ge=0, le=100)
     depth: int = Field(ge=0, le=100)
     reasoning: int = Field(ge=0, le=100)
