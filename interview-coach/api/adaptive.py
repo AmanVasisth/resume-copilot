@@ -46,9 +46,24 @@ def select_next_question(
     return unused[0]
 
 def readiness_report(candidate: CandidateProfile, state: InterviewState) -> dict:
-    skills={}
-    for skill in state.skill_scores:
-        skills[skill]=state.average(skill)
+    # Rebuild per-skill scores from the full question/evaluation history.
+    # The API may receive asked/evaluations pre-populated, in which case the
+    # incremental skill_scores cache is empty and would otherwise hide all gaps.
+    scores_by_skill: dict[str, list[int]] = {}
+    for question, evaluation in zip(state.asked, state.evaluations):
+        skill = (question.skill or "General").strip()
+        scores_by_skill.setdefault(skill, []).append(int(evaluation.score))
+
+    # Preserve any incremental scores that are not represented in the zipped history.
+    for skill, values in state.skill_scores.items():
+        existing = scores_by_skill.setdefault(skill, [])
+        if not existing:
+            existing.extend(int(value) for value in values)
+
+    skills = {
+        skill: round(sum(values) / len(values))
+        for skill, values in scores_by_skill.items() if values
+    }
 
     overall=state.overall()
     weak=sorted(skills.items(), key=lambda x:x[1])[:3]
