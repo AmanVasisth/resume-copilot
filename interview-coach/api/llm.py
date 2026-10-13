@@ -39,7 +39,7 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
 
 def _gemini(prompt: str) -> dict[str, Any] | None:
     key = os.getenv("GEMINI_API_KEY")
-    model = os.getenv("LLM_MODEL", "gemini-3.8-flash")
+    model = os.getenv("LLM_MODEL", "gemini-2.5-flash")
     if not key:
         logger.warning("GEMINI_API_KEY is not configured; using fallback evaluator.")
         return None
