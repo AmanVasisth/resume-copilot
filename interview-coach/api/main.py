@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
@@ -105,7 +106,9 @@ def evaluate(req: EvaluateAnswerRequest):
         llm_result = evaluate_with_llm(req.question, req.answer, req.candidate)
         if llm_result:
             try:
-                result = AnswerEvaluation.model_validate(llm_result)
+                llm_payload = dict(llm_result)
+                provider_used = llm_payload.pop("_evaluation_provider", "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini")
+                result = AnswerEvaluation.model_validate({**llm_payload, "evaluation_provider": provider_used})
                 result.evaluation_method = "llm_rubric"
                 result.confidence = "medium"
             except Exception:
