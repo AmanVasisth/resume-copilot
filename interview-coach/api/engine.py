@@ -64,13 +64,32 @@ def build_profile(req) -> CandidateProfile:
         skill_evidence=build_skill_evidence(req.resume_text, resume_skills),
     )
 
-def make_questions(profile: CandidateProfile, count: int, mode: str) -> list[Question]:
+def make_questions(profile: CandidateProfile, count: int, mode: str, memory_topics: list[dict] | None = None) -> list[Question]:
     questions=[]
     diff=seniority(profile.target_role, profile.years_experience)
+    memory_topics = memory_topics or []
 
     def add(q):
         if len(questions) < count and q.question not in {x.question for x in questions}:
             questions.append(q)
+
+    # Prioritize previously weak skills from saved interview history, without inventing candidate experience.
+    for i, topic in enumerate(memory_topics):
+        skill = str(topic.get("skill") or "").strip()
+        if not skill or len(questions) >= count:
+            continue
+        score = topic.get("score")
+        weakness_text = "; ".join(str(x) for x in (topic.get("weaknesses") or [])[:3])
+        practice = str(topic.get("practice") or "")
+        add(Question(
+            id=f"memory-{i+1}",
+            category="technical",
+            skill=skill,
+            difficulty=diff,
+            source="memory",
+            question=f"Previous practice indicates {skill} needs more evidence (average score: {score if score is not None else 'not enough data'}/100). {practice} Explain a real example and address these previous gaps: {weakness_text or 'show implementation depth, decision rationale, validation and outcome'}.",
+            rationale=f"Personalized follow-up based on saved interview performance in {skill}.",
+        ))
 
     # First cover JD priorities. If the resume contains evidence, challenge ownership;
     # if it doesn't, test whether the candidate can genuinely perform the requirement.
