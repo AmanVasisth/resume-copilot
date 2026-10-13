@@ -218,6 +218,27 @@ def evaluate_answer(question: Question, answer: str, candidate: CandidateProfile
             next_focus=question.skill,
         )
 
+    # Conservative relevance gate: do not reward fluent-sounding but unrelated answers.
+    anchor_words = [w for w in re.findall(r"[a-zA-Z][a-zA-Z0-9+#.-]*", (question.skill + " " + question.question).lower())
+                    if len(w) >= 4 and w not in {"describe","project","using","problem","personal","contribution","decision","trade","tradeoff","validation","validate","measurable","result","explain","walk","through","what","your","from","with","this","that","have","been","were","into","under","over","about","answer","role","real","specific","experience","work","built","used","tell","make","made","which","where","when","would","could","should","actual","hardest","design","choice","personally"}]
+    anchors = list(dict.fromkeys(anchor_words))
+    matched_anchors = [w for w in anchors if w in lower]
+    if len(words) < 12 or (not matched_anchors and question.skill.lower() not in lower):
+        low_score = min(12, 3 + len(words) // 8)
+        return AnswerEvaluation(
+            score=low_score, technical_correctness=low_score, depth=low_score,
+            reasoning=low_score, specificity=low_score, communication=25,
+            strengths=[],
+            weaknesses=[
+                "This answer does not demonstrate that you answered the specific question.",
+                f"Name the actual technology or workflow relevant to {question.skill}, and explain what you personally did.",
+                "Add a real decision, how you validated it, and the actual outcome. Do not invent metrics."
+            ],
+            follow_up_question=(f"Your answer is too vague to verify. What was the real problem, what did you personally implement for {question.skill}, and how did you validate the result?") if not question.id.startswith("followup-") else None,
+            next_focus=question.skill,
+            evaluation_method="heuristic_fallback", confidence="low",
+        )
+
     specificity=min(100,30+min(45,len(words)//2)+(20 if any(x in lower for x in ("example","metric","result","impact","baseline","measured")) else 0))
     reasoning=min(100,35+(20 if any(x in lower for x in ("because","therefore","trade-off","alternative","chose","decision")) else 0)+(20 if len(words)>80 else 0))
     technical=min(100,35+(25 if any(k.lower() in lower for k in candidate.skills) else 0)+(20 if len(words)>60 else 0))
