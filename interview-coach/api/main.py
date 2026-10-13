@@ -60,6 +60,17 @@ def sessions(candidate_key: str, limit: int = 25):
 def progress(candidate_key: str):
     return database.progress_summary(candidate_key)
 
+@app.get("/v1/recommendations")
+def recommendations(candidate_key: str):
+    summary = database.progress_summary(candidate_key)
+    topics = []
+    for skill in summary.get("skills", []):
+        if skill.get("average_score", 100) < 70:
+            topics.append({"skill": skill["skill"], "score": skill["average_score"], "reason": "Your saved answers in this skill are below 70 on average.", "practice": "Explain a real implementation, your decision, one trade-off, and how you validated the outcome."})
+    if not topics:
+        topics.append({"skill": "Project Deep Dive", "score": None, "reason": "Build more evidence across sessions.", "practice": "Explain the business problem, your contribution, a technical decision, and a measurable outcome."})
+    return {"topics": topics[:5], "message": "Recommendations are based on saved interview scores and are practice guidance, not a formal assessment."}
+
 @app.get("/v1/sessions/{session_id}")
 def session_detail(session_id: int, candidate_key: str):
     try:
