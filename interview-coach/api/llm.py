@@ -56,7 +56,14 @@ def _gemini(prompt: str) -> dict[str, Any] | None:
             },
             timeout=45,
         )
-        r.raise_for_status()
+        if not r.ok:
+            # Log Google's safe error message (never log the API key).
+            try:
+                detail = r.json().get("error", {}).get("message", "No error message returned")
+            except Exception:
+                detail = "No error message returned"
+            logger.warning("Gemini API HTTP %s: %s", r.status_code, detail)
+            return None
         payload = r.json()
         text = payload["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text)
