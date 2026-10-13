@@ -97,12 +97,13 @@ def complete_session(session_id: int, payload: dict):
 
 @app.post("/v1/interview/evaluate", response_model=AnswerEvaluation)
 def evaluate(req: EvaluateAnswerRequest):
-    llm_result=evaluate_with_llm(req.question, req.answer, req.candidate)
-    result = (
-        AnswerEvaluation.model_validate(llm_result)
-        if llm_result
-        else evaluate_answer(req.question, req.answer, req.candidate)
-    )
+    normalized = " ".join(req.answer.lower().split())
+    short_or_nonanswer = len(req.answer.strip().split()) < 3 or normalized in {"no", "nope", "n/a", "na", "idk", "dont know", "not sure", "skip", "pass", "nothing"}
+    if short_or_nonanswer:
+        result = evaluate_answer(req.question, req.answer, req.candidate)
+    else:
+        llm_result=evaluate_with_llm(req.question, req.answer, req.candidate)
+        result = AnswerEvaluation.model_validate(llm_result) if llm_result else evaluate_answer(req.question, req.answer, req.candidate)
     # Adaptive probing is only needed for a weak answer, and only one level deep.
     if req.question.id.startswith("followup-") or result.score >= 65:
         result.follow_up_question = None
