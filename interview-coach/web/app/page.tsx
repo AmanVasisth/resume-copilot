@@ -101,7 +101,8 @@ export default function Home(){
       </main>
     );
   }
- return <main className="dashboard-shell">
+ return (
+ <main className="dashboard-shell">
   <aside className="sidebar">
     <div className="brand-lockup"><span className="brand-mark">✦</span><div className="logo">CareerCoach <span>AI</span></div></div>
     <div className="nav-label">WORKSPACE</div>
