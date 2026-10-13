@@ -184,6 +184,30 @@ def evaluate_answer(question: Question, answer: str, candidate: CandidateProfile
     words=re.findall(r"\b\w+\b",text)
     lower=text.lower()
 
+    # Hard gate: empty, one-word, or clearly non-responsive answers must not
+    # receive a misleading mid-range score from the generic component averages.
+    non_answers = {"no", "nope", "n/a", "na", "idk", "i don't know", "dont know", "not sure", "skip", "pass", "nothing"}
+    if len(words) < 3 or lower in non_answers:
+        return AnswerEvaluation(
+            score=5,
+            technical_correctness=0,
+            depth=0,
+            reasoning=0,
+            specificity=0,
+            communication=25 if text else 0,
+            strengths=["You submitted an answer, but it does not provide enough evidence to assess the skill."],
+            weaknesses=[
+                "This answer does not address the question yet.",
+                "If you have not used this technology, say so honestly and explain your related experience or what you know.",
+                "If you have used it, describe one real example, your contribution, the decision you made, and the outcome.",
+            ],
+            follow_up_question=(
+                f"Have you used {question.skill} in a real project? If yes, describe one specific task and your contribution. "
+                "If not, say so honestly and explain the closest related experience you have."
+            ) if not question.id.startswith("followup-") else None,
+            next_focus=question.skill,
+        )
+
     specificity=min(100,30+min(45,len(words)//2)+(20 if any(x in lower for x in ("example","metric","result","impact","baseline","measured")) else 0))
     reasoning=min(100,35+(20 if any(x in lower for x in ("because","therefore","trade-off","alternative","chose","decision")) else 0)+(20 if len(words)>80 else 0))
     technical=min(100,35+(25 if any(k.lower() in lower for k in candidate.skills) else 0)+(20 if len(words)>60 else 0))
