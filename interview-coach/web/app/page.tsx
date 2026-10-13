@@ -134,4 +134,3 @@ export default function Home(){
     <footer className="dashboard-footer"><span>CareerCoach AI</span><span>Built for deliberate practice · Your next opportunity starts here.</span></footer>
   </div>
  </main>
-}
