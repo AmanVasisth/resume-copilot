@@ -33,7 +33,20 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
         return None
 
 def evaluate_with_llm(question, answer, candidate):
-    prompt = f"""Evaluate this interview answer.
+    prompt = f"""You are grading a real professional interview answer. Be evidence-based, strict, and fair.
+Do not give points for length, confidence, grammar alone, or repeating words from the question.
+First determine whether the answer actually addresses the question. If it is vague, irrelevant, or merely says they did the project without specifics, the total score MUST be 0-15 and technical correctness/depth/reasoning/specificity must each be 0-10. A fluent but unrelated answer is not a strong answer.
+Do not assume facts the candidate did not state. Do not invent missing details or metrics. Distinguish an incorrect claim from missing evidence.
+Use this rubric:
+- relevance to the exact question: 25%
+- technical/role correctness: 25%
+- personal ownership and specificity: 15%
+- reasoning, design decisions and trade-offs: 15%
+- validation and evidence of outcome: 10%
+- communication clarity and structure: 10%
+For project questions, check the business problem, personal contribution, design decision, trade-off, validation and actual result. Missing a requested dimension must lower the score.
+For a short or vague answer, provide a low score and a helpful follow-up question that asks for the most important missing evidence. Praise only what is genuinely present. If an answer states no real experience, reward honesty but do not rate it as demonstrated technical competence.
+Return integers 0-100 for component scores and overall score. Overall score must reflect the rubric, not an average inflated by communication.
 
 Candidate profile:
 {candidate.model_dump_json(indent=2)}
@@ -41,10 +54,10 @@ Candidate profile:
 Question:
 {question.model_dump_json(indent=2)}
 
-Answer:
+Candidate answer:
 {answer}
 
-Return JSON with exactly:
+Return JSON with exactly these keys:
 {{
   "score": 0,
   "technical_correctness": 0,
@@ -52,12 +65,12 @@ Return JSON with exactly:
   "reasoning": 0,
   "specificity": 0,
   "communication": 0,
-  "strengths": ["..."],
-  "weaknesses": ["..."],
-  "follow_up_question": "...",
-  "next_focus": "..."
+  "strengths": ["only evidence-backed strengths"],
+  "weaknesses": ["specific missing or incorrect elements"],
+  "follow_up_question": "one targeted follow-up or empty string",
+  "next_focus": "the most important competency to improve"
 }}
-Scores are 0-100. The follow-up must react specifically to the candidate's answer."""
+The follow-up must be based on this answer, not a generic template."""
     if _provider() == "openrouter":
         return _openrouter(prompt)
     return None
