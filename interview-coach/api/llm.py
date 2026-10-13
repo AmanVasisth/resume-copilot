@@ -74,20 +74,45 @@ def _gemini(prompt: str) -> dict[str, Any] | None:
         return None
 
 def evaluate_with_llm(question, answer, candidate):
-    prompt = f"""You are grading a real professional interview answer. Be evidence-based, strict, and fair.
-Do not give points for length, confidence, grammar alone, or repeating words from the question.
-First determine whether the answer actually addresses the question. If it is vague, irrelevant, or merely says they did the project without specifics, the total score MUST be 0-15 and technical correctness/depth/reasoning/specificity must each be 0-10. A fluent but unrelated answer is not a strong answer.
-Do not assume facts the candidate did not state. Do not invent missing details or metrics. Distinguish an incorrect claim from missing evidence.
-Use this rubric:
-- relevance to the exact question: 25%
-- technical/role correctness: 25%
-- personal ownership and specificity: 15%
-- reasoning, design decisions and trade-offs: 15%
-- validation and evidence of outcome: 10%
-- communication clarity and structure: 10%
-For project questions, check the business problem, personal contribution, design decision, trade-off, validation and actual result. Missing a requested dimension must lower the score.
-For a short or vague answer, provide a low score and a helpful follow-up question that asks for the most important missing evidence. Praise only what is genuinely present. If an answer states no real experience, reward honesty but do not rate it as demonstrated technical competence.
-Return integers 0-100 for component scores and overall score. Overall score must reflect the rubric, not an average inflated by communication.
+    prompt = f"""You are grading a professional interview answer. Be evidence-based, calibrated, and consistent across providers.
+Do not reward length, confidence, grammar alone, or keyword stuffing. Never invent facts or metrics. Treat hypothetical wording ("I would test", "I would measure") as a proposed plan, NOT completed validation or an achieved result.
+Score each dimension independently from 0 to 100:
+- relevance: 0=unrelated, 25=topic only, 50=partially answers, 75=answers most asks, 100=fully addresses the exact question.
+- technical_correctness: 0=wrong/unrelated, 25=generic, 50=some correct specifics, 75=technically solid, 100=precise and defensible.
+- ownership: 0=no contribution, 25=generic "worked on it", 50=some tasks, 75=clear individual ownership, 100=clear decisions and accountable implementation.
+- reasoning: 0=no reasoning, 25=names a choice only, 50=some rationale, 75=compares alternatives and trade-offs, 100=strong evidence-backed reasoning.
+- validation: 0=none, 25=only says tested/would test, 50=method without results, 75=real test evidence, 100=quantified and reproducible evidence.
+- depth: 0=none, 25=surface-level, 50=useful implementation details, 75=deep implementation/failure handling, 100=senior-level detail and sound limits.
+- specificity: 0=none, 25=generic, 50=some specifics, 75=concrete and attributable, 100=highly specific and verifiable.
+- communication: clarity and structure only; do not let this inflate a technically weak answer.
+Calculate overall score using this exact weighted formula, rounded to nearest integer:
+overall = 0.20*relevance + 0.20*technical_correctness + 0.15*ownership + 0.15*reasoning + 0.10*validation + 0.10*depth + 0.05*specificity + 0.05*communication.
+The "score" must equal that formula within 1 point. Do not choose the overall score by intuition.
+Calibration checks:
+- Irrelevant or very vague answers with no usable evidence: 0-15 overall.
+- Some relevant technical details but mostly generic, hypothetical validation, no actual result: usually 25-50, depending on correctness and relevance. Do not automatically assign 5-15 just because metrics are missing.
+- Clear implementation, sound reasoning and actual validation, but limited metrics: usually 50-70.
+- Strong, specific, technically sound answer with clear personal ownership, trade-offs, completed validation and evidence: usually 70-90.
+- 90+ requires exceptional, detailed, defensible evidence; polished generic answers do not qualify.
+For project questions, assess business problem, personal contribution, design decision, trade-off, completed validation and actual outcome. Missing one dimension lowers that dimension; do not treat one missing metric as proof the entire answer is worthless.
+A correct technical term is a positive signal but not proof of hands-on experience. Use candidate profile only as context; resume skills do not prove this answer's claims. Praise only evidence-backed strengths. If no genuine strength exists, return an empty strengths array.
+Return integers 0-100 for every score and exactly these keys:
+{{
+  "score": 0,
+  "relevance": 0,
+  "technical_correctness": 0,
+  "ownership": 0,
+  "reasoning": 0,
+  "validation": 0,
+  "depth": 0,
+  "specificity": 0,
+  "communication": 0,
+  "strengths": ["only evidence-backed strengths"],
+  "weaknesses": ["specific missing or incorrect elements"],
+  "follow_up_question": "one targeted follow-up or empty string",
+  "next_focus": "the most important competency to improve"
+}}
+The follow-up must be based on this answer, not a generic template.
 
 Candidate profile:
 {candidate.model_dump_json(indent=2)}
@@ -97,21 +122,7 @@ Question:
 
 Candidate answer:
 {answer}
-
-Return JSON with exactly these keys:
-{{
-  "score": 0,
-  "technical_correctness": 0,
-  "depth": 0,
-  "reasoning": 0,
-  "specificity": 0,
-  "communication": 0,
-  "strengths": ["only evidence-backed strengths"],
-  "weaknesses": ["specific missing or incorrect elements"],
-  "follow_up_question": "one targeted follow-up or empty string",
-  "next_focus": "the most important competency to improve"
-}}
-The follow-up must be based on this answer, not a generic template."""
+"""
     provider = _provider()
     if provider == "openrouter":
         result = _openrouter(prompt)
