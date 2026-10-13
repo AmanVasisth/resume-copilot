@@ -145,3 +145,52 @@ def progress_summary(candidate_key: str) -> dict:
         "skills": skills,
         "priority_gaps": weak,
     }
+
+
+def detailed_recommendations(candidate_key: str) -> dict:
+    summary = progress_summary(candidate_key)
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT a.skill,a.score,a.question,a.answer,a.evaluation_json,a.created_at
+            FROM answers a JOIN sessions s ON s.id=a.session_id
+            WHERE s.candidate_key=? ORDER BY a.created_at DESC LIMIT 200""",
+            (candidate_key,),
+        ).fetchall()
+    by_skill = {}
+    for row in rows:
+        skill = (row["skill"] or "General").strip()
+        item = by_skill.setdefault(skill, {"scores": [], "weaknesses": [], "examples": []})
+        item["scores"].append(int(row["score"]))
+        evaluation = json.loads(row["evaluation_json"])
+        for weakness in (evaluation.get("weaknesses") or []):
+            if weakness not in item["weaknesses"]:
+                item["weaknesses"].append(weakness)
+        if len(item["examples"]) < 2:
+            item["examples"].append({"question": row["question"], "answer_excerpt": (row["answer"] or "")[:260], "score": int(row["score"])})
+    topics = []
+    for skill in summary.get("skills", []):
+        skill_name = skill["skill"]
+        detail = by_skill.get(skill_name, {})
+        weaknesses = detail.get("weaknesses", [])[:4]
+        topics.append({
+            "skill": skill_name,
+            "score": skill["average_score"],
+            "latest_score": skill["latest_score"],
+            "trend": skill["trend"],
+            "weaknesses": weaknesses or (["Score below target"] if skill["average_score"] < 70 else ["Add more real-world detail and validation evidence"]),
+            "examples": detail.get("examples", []),
+            "practice": _practice_for_skill(skill_name, weaknesses, skill["average_score"]),
+        })
+    topics.sort(key=lambda t: (t["score"], t["skill"]))
+    return {"topics": topics[:8], "message": "Built from saved answers and feedback. Use this as practice guidance, not a formal assessment."}
+
+
+def _practice_for_skill(skill: str, weaknesses: list[str], score: int) -> str:
+    text = " ".join(weaknesses).lower()
+    if any(word in text for word in ["short", "context", "specific example", "measurable", "outcome", "trade-off", "tradeoff"]):
+        return f"Describe one {skill} project using the problem, your personal contribution, a design decision, a trade-off, validation, and a measurable result."
+    if any(word in text for word in ["depth", "technical", "correct", "reasoning", "explain"]):
+        return f"Explain how you used {skill} in production, why you chose the approach, alternatives you considered, failure handling, and how you tested it."
+    if score < 65:
+        return f"Review core {skill} concepts, then solve one scenario end-to-end and explain assumptions, implementation steps, edge cases, and validation."
+    return f"Give a specific {skill} example, justify your decisions, discuss one trade-off, and quantify the result where possible."
