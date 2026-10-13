@@ -37,6 +37,33 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
         logger.warning("LLM evaluation unavailable (%s); using fallback evaluator.", type(exc).__name__)
         return None
 
+def _gemini(prompt: str) -> dict[str, Any] | None:
+    key = os.getenv("GEMINI_API_KEY")
+    model = os.getenv("LLM_MODEL", "gemini-3.8-flash")
+    if not key:
+        logger.warning("GEMINI_API_KEY is not configured; using fallback evaluator.")
+        return None
+    try:
+        import requests
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        r = requests.post(
+            url,
+            headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+            json={
+                "system_instruction": {"parts": [{"text": SYSTEM}]},
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2},
+            },
+            timeout=45,
+        )
+        r.raise_for_status()
+        payload = r.json()
+        text = payload["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(text)
+    except Exception as exc:
+        logger.warning("Gemini evaluation unavailable (%s); using fallback evaluator.", type(exc).__name__)
+        return None
+
 def evaluate_with_llm(question, answer, candidate):
     prompt = f"""You are grading a real professional interview answer. Be evidence-based, strict, and fair.
 Do not give points for length, confidence, grammar alone, or repeating words from the question.
@@ -76,6 +103,9 @@ Return JSON with exactly these keys:
   "next_focus": "the most important competency to improve"
 }}
 The follow-up must be based on this answer, not a generic template."""
-    if _provider() == "openrouter":
+    provider = _provider()
+    if provider == "openrouter":
         return _openrouter(prompt)
+    if provider == "gemini":
+        return _gemini(prompt)
     return None
