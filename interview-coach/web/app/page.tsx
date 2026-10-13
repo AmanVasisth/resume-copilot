@@ -37,8 +37,70 @@ export default function Home(){
 
  async function finishInterview(){if(!plan||!feedback)return;setLoading(true);stopListening();const q=plan.questions[index],a=[...asked,q],e=[...evals,feedback];try{const r=await fetch(API+"/v1/interview/next",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({candidate:plan.profile,available_questions:plan.questions,asked_questions:a,evaluations:e,last_question:q,last_evaluation:feedback})});const out=await r.json();if(!r.ok)throw new Error(out.detail||"Could not create readiness report");setAsked(a);setEvals(e);setReport(out.readiness);if(sessionId){await fetch(API+"/v1/sessions/"+sessionId+"/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({candidate_key:candidateKey,overall_score:Number(out.readiness?.overall_readiness||0)})})}}catch(err){console.error(err);alert("Could not finish the interview. Please try again.")}finally{setLoading(false)}}
 
- if(report)return <main className="shell"><header><div className="logo">CareerCoach <span>AI</span></div><div className="header-actions"><button type="button" className="history-button" onClick={()=>{setPlan(null);setReport(null);setFeedback(null);setShowHistory(true);loadHistory()}}>Interview history</button></div></header><section className="card"><div className="eyebrow">INTERVIEW READINESS</div><div className="score">{report.overall_readiness}<small>/100</small></div><h1>{report.recommendation}</h1><div className="grid">{Object.entries(report.skill_scores||{}).map(([k,v])=><div className="metric" key={k}><b>{k}</b><strong>{String(v)}</strong></div>)}</div><h3>Priority gaps</h3><p>{(report.priority_gaps||[]).join(" · ")||"No major gaps detected."}</p><button onClick={()=>{setPlan(null);setReport(null);setFeedback(null);setAnswer("");setAsked([]);setEvals([]);setSessionId(null);setIndex(0)}}>Start another interview</button></section></main>;
- if(plan){const q=plan.questions[index];return <main className="shell"><header><div className="logo">CareerCoach <span>AI</span></div><div className="pill">{voice?"🎙 Voice interview":"Text interview"}</div></header><section className="card"><div className="eyebrow">{q.category.toUpperCase()} · {q.skill} · {q.difficulty}</div><h1>{q.question}</h1>{voice&&<div className="voicebar"><button className={listening?"recording":""} onClick={listening?stopListening:startListening}>{listening?"● Listening…":"🎙 Speak answer"}</button><span>{listening?"Speak naturally. Your answer is being transcribed.":"Use your microphone or type below."}</span></div>}<textarea value={answer} onChange={e=>setAnswer(e.target.value)} placeholder={voice?"Your spoken answer will appear here…":"Answer as if you are in the real interview..."}/>{voice&&voiceError&&<p className="error">{voiceError}</p>}{!feedback?<button disabled={loading||!answer.trim()} onClick={submit}>{loading?"Evaluating…":"Submit answer"}</button>:<div className="feedback"><div className="score">{feedback.score}<small>/100</small></div><b>Strengths</b>{feedback.strengths.map(x=><p key={x}>✓ {x}</p>)}<b>Improve</b>{feedback.weaknesses.map(x=><p key={x}>→ {x}</p>)}{feedback.follow_up_question&&<div className="follow"><b>AI follow-up</b><p>{feedback.follow_up_question}</p></div>}<div className="feedback-actions"><button disabled={loading} onClick={next}>{loading?"Adapting…":"Continue adaptive interview"}</button><button type="button" className="finish-button" disabled={loading} onClick={finishInterview}>{loading?"Finishing…":"Finish interview & view report"}</button></div></div>}</section></main>}
+  if (report) {
+    return (
+      <main className="shell">
+        <header>
+          <div className="logo">CareerCoach <span>AI</span></div>
+          <div className="header-actions">
+            <button type="button" className="history-button" onClick={() => { setPlan(null); setReport(null); setFeedback(null); setShowHistory(true); loadHistory(); }}>Interview history</button>
+          </div>
+        </header>
+        <section className="card">
+          <div className="eyebrow">INTERVIEW READINESS</div>
+          <div className="score">{report.overall_readiness}<small>/100</small></div>
+          <h1>{report.recommendation}</h1>
+          <div className="grid">
+            {Object.entries(report.skill_scores || {}).map(([k, v]) => (
+              <div className="metric" key={k}><b>{k}</b><strong>{String(v)}</strong></div>
+            ))}
+          </div>
+          <h3>Priority gaps</h3>
+          <p>{(report.priority_gaps || []).join(" · ") || "No major gaps detected."}</p>
+          <button onClick={() => { setPlan(null); setReport(null); setFeedback(null); setAnswer(""); setAsked([]); setEvals([]); setSessionId(null); setIndex(0); }}>Start another interview</button>
+        </section>
+      </main>
+    );
+  }
+  if (plan) {
+    const q = plan.questions[index];
+    return (
+      <main className="shell">
+        <header>
+          <div className="logo">CareerCoach <span>AI</span></div>
+          <div className="pill">{voice ? "🎙 Voice interview" : "Text interview"}</div>
+        </header>
+        <section className="card">
+          <div className="eyebrow">{q.category.toUpperCase()} · {q.skill} · {q.difficulty}</div>
+          <h1>{q.question}</h1>
+          {voice && (
+            <div className="voicebar">
+              <button className={listening ? "recording" : ""} onClick={listening ? stopListening : startListening}>{listening ? "● Listening…" : "🎙 Speak answer"}</button>
+              <span>{listening ? "Speak naturally. Your answer is being transcribed." : "Use your microphone or type below."}</span>
+            </div>
+          )}
+          <textarea value={answer} onChange={e => setAnswer(e.target.value)} placeholder={voice ? "Your spoken answer will appear here…" : "Answer as if you are in the real interview..."} />
+          {voice && voiceError && <p className="error">{voiceError}</p>}
+          {!feedback ? (
+            <button disabled={loading || !answer.trim()} onClick={submit}>{loading ? "Evaluating…" : "Submit answer"}</button>
+          ) : (
+            <div className="feedback">
+              <div className="score">{feedback.score}<small>/100</small></div>
+              <b>Strengths</b>
+              {feedback.strengths.map(x => <p key={x}>✓ {x}</p>)}
+              <b>Improve</b>
+              {feedback.weaknesses.map(x => <p key={x}>→ {x}</p>)}
+              {feedback.follow_up_question && <div className="follow"><b>AI follow-up</b><p>{feedback.follow_up_question}</p></div>}
+              <div className="feedback-actions">
+                <button disabled={loading} onClick={next}>{loading ? "Adapting…" : "Continue adaptive interview"}</button>
+                <button type="button" className="finish-button" disabled={loading} onClick={finishInterview}>{loading ? "Finishing…" : "Finish interview & view report"}</button>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
  return <main className="dashboard-shell">
   <aside className="sidebar">
     <div className="brand-lockup"><span className="brand-mark">✦</span><div className="logo">CareerCoach <span>AI</span></div></div>
