@@ -109,6 +109,17 @@ def evaluate(req: EvaluateAnswerRequest):
                 llm_payload = dict(llm_result)
                 provider_used = llm_payload.pop("_evaluation_provider", "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini")
                 result = AnswerEvaluation.model_validate({**llm_payload, "evaluation_provider": provider_used})
+                # Enforce the same weighted score regardless of which provider answered.
+                result.score = round(
+                    0.20 * result.relevance
+                    + 0.20 * result.technical_correctness
+                    + 0.15 * result.ownership
+                    + 0.15 * result.reasoning
+                    + 0.10 * result.validation
+                    + 0.10 * result.depth
+                    + 0.05 * result.specificity
+                    + 0.05 * result.communication
+                )
                 result.evaluation_method = "llm_rubric"
                 result.confidence = "medium"
             except Exception:
