@@ -177,7 +177,31 @@ def make_questions(profile: CandidateProfile, count: int, mode: str, memory_topi
             rationale=f"Tests hands-on resume evidence for {skill}.",
         ))
 
-    return questions[:count]
+    selected = questions[:count]
+    if mode == "pressure":
+        # Pressure mode changes the interview behavior, not just the label:
+        # every prompt demands concise evidence, ownership and defensible reasoning.
+        for q in selected:
+            if q.category == "technical":
+                q.question = (
+                    "PRESSURE ROUND — Answer in about 90 seconds. "
+                    + q.question
+                    + " Be precise: state your assumptions, what you personally did, and how you would defend the decision if challenged."
+                )
+            elif q.category == "project":
+                q.question = (
+                    "PRESSURE ROUND — You have about 90 seconds. "
+                    + q.question
+                    + " Expect a challenge on your ownership, evidence, and trade-offs; do not claim results you cannot support."
+                )
+            else:
+                q.question = (
+                    "PRESSURE ROUND — Give a concise, structured answer in about 90 seconds. "
+                    + q.question
+                    + " Finish with the outcome and one lesson learned."
+                )
+            q.rationale = (q.rationale + " Pressure mode emphasizes concise, defensible answers under challenge.").strip()
+    return selected
 
 def evaluate_answer(question: Question, answer: str, candidate: CandidateProfile) -> AnswerEvaluation:
     text=answer.strip()
