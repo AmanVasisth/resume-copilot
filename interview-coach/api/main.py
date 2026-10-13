@@ -38,8 +38,15 @@ async def extract_resume(file: UploadFile = File(...)):
 
 @app.post("/v1/interview/plan", response_model=InterviewPlan)
 def create_plan(req: InterviewRequest):
-    profile=build_profile(req)
-    return InterviewPlan(profile=profile, questions=make_questions(profile, req.question_count, req.mode))
+    profile = build_profile(req)
+    memory_topics = []
+    if req.candidate_key:
+        try:
+            memory_topics = database.detailed_recommendations(req.candidate_key).get("topics", [])
+        except Exception:
+            memory_topics = []
+    questions = make_questions(profile, req.question_count, req.mode, memory_topics=memory_topics)
+    return InterviewPlan(profile=profile, questions=questions)
 
 @app.post("/v1/sessions")
 def start_session(payload: dict):
