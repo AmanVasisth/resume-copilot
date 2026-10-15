@@ -41,27 +41,67 @@ export default function Home(){
  async function finishInterview(){if(!plan||!feedback)return;setLoading(true);stopListening();const q=plan.questions[index],a=[...asked,q],e=[...evals,feedback];try{const r=await fetch(API+"/v1/interview/next",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({candidate:plan.profile,available_questions:plan.questions,asked_questions:a,evaluations:e,last_question:q,last_evaluation:feedback})});const out=await r.json();if(!r.ok)throw new Error(out.detail||"Could not create readiness report");setAsked(a);setEvals(e);setReport(out.readiness);if(sessionId){await fetch(API+"/v1/sessions/"+sessionId+"/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({candidate_key:candidateKey,overall_score:Number(out.readiness?.overall_readiness||0)})})}}catch(err){console.error(err);alert("Could not finish the interview. Please try again.")}finally{setLoading(false)}}
 
   if (report) {
+    const dimensions = [
+      { key: "technical_correctness", label: "Technical accuracy" },
+      { key: "relevance", label: "Question relevance" },
+      { key: "ownership", label: "Personal contribution" },
+      { key: "reasoning", label: "Reasoning & decisions" },
+      { key: "validation", label: "Validation & results" },
+      { key: "depth", label: "Technical depth" },
+      { key: "specificity", label: "Specificity" },
+      { key: "communication", label: "Communication" },
+    ];
+    const dimensionScores = dimensions.map(d => {
+      const values = evals.map(e => Number((e as any)[d.key])).filter(v => Number.isFinite(v));
+      return { ...d, score: values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0 };
+    });
+    const practicePriorities = [...dimensionScores].sort((a, b) => a.score - b.score).slice(0, 3);
+    const answeredQuestions = asked.map((q, i) => ({ question: q, evaluation: evals[i] })).filter(x => x.evaluation);
     return (
-      <main className="shell">
+      <main className="shell report-shell">
         <header>
           <div className="logo">CareerCoach <span>AI</span></div>
           <div className="header-actions">
             <button type="button" className="history-button" onClick={() => { setPlan(null); setReport(null); setFeedback(null); setShowHistory(true); loadHistory(); }}>Interview history</button>
+            <button type="button" className="history-button" onClick={() => window.print()}>Print / Save PDF</button>
           </div>
         </header>
-        <section className="card">
-          <div className="eyebrow">INTERVIEW READINESS</div>
-          <div className="score">{report.overall_readiness}<small>/100</small></div>
-          <h1>{report.recommendation}</h1>
-          <div className="grid">
-            {Object.entries(report.skill_scores || {}).map(([k, v]) => (
-              <div className="metric" key={k}><b>{k}</b><strong>{String(v)}</strong></div>
-            ))}
+        <section className="card report-hero">
+          <div className="eyebrow">YOUR INTERVIEW DEBRIEF</div>
+          <div className="report-score-row">
+            <div><div className="score">{report.overall_readiness}<small>/100</small></div><p className="report-muted">Overall practice score · {answeredQuestions.length} answers reviewed</p></div>
+            <div className="report-status"><span className="report-status-dot"/><b>{report.recommendation}</b><small>Use this as practice guidance, not a hiring prediction.</small></div>
           </div>
-          <h3>Priority gaps</h3>
-          <p>{(report.priority_gaps || []).join(" · ") || "No major gaps detected."}</p>
-          <button onClick={() => { setPlan(null); setReport(null); setFeedback(null); setAnswer(""); setAsked([]); setEvals([]); setSessionId(null); setIndex(0); }}>Start another interview</button>
+          <div className="report-stat-grid">
+            <div><span>Questions answered</span><strong>{answeredQuestions.length}</strong></div>
+            <div><span>Strongest skill</span><strong>{(report.top_strengths || [])[0] || "Keep practising"}</strong></div>
+            <div><span>Priority gaps</span><strong>{(report.priority_gaps || []).length}</strong></div>
+          </div>
         </section>
+        <section className="card report-section">
+          <div className="eyebrow">SKILL BREAKDOWN</div><h2>Where you stand</h2>
+          <p className="report-muted">Scores reflect your answers in this practice session, not a formal certification.</p>
+          {Object.entries(report.skill_scores || {}).length ? <div className="report-skill-list">
+            {Object.entries(report.skill_scores || {}).map(([k, v]) => {
+              const score = Math.max(0, Math.min(100, Number(v) || 0));
+              return <div className="report-skill" key={k}><div><b>{k}</b><strong>{score}/100</strong></div><div className="report-track"><span style={{width: score + "%"}}/></div><small>{score >= 80 ? "Strong evidence in this session" : score >= 65 ? "Developing — add more evidence" : "Priority area to practise"}</small></div>;
+            })}
+          </div> : <p>No skill-level scores were recorded.</p>}
+          <h3 className="report-subheading">Core interview dimensions</h3>
+          <div className="report-dimensions">{dimensionScores.map(d => <div className="report-dimension" key={d.key}><span>{d.label}</span><b>{d.score}</b><div className="report-track"><span style={{width: d.score + "%"}}/></div></div>)}</div>
+        </section>
+        <section className="card report-section">
+          <div className="eyebrow">YOUR NEXT PRACTICE PLAN</div><h2>Turn gaps into a plan</h2>
+          <p className="report-muted">Start with the lowest-scoring dimensions. Use real examples and never invent project metrics.</p>
+          <div className="report-practice-list">{practicePriorities.map((d, i) => <article className="report-practice-card" key={d.key}><div className="report-practice-number">0{i+1}</div><div><b>{d.label} <span>{d.score}/100</span></b><p>{d.key === "technical_correctness" ? "Review the core concept, explain what each service actually does, and distinguish retrieval, orchestration and generation." : d.key === "relevance" ? "Answer the exact question first, then connect your example to the role and business problem." : d.key === "ownership" ? "Separate what you personally implemented from what the wider team delivered; name your concrete actions." : d.key === "reasoning" ? "Explain the options you considered, why you chose one, and the trade-off you accepted." : d.key === "validation" ? "Describe test cases, the baseline, how you measured results, and only report metrics you can substantiate." : d.key === "depth" ? "Add implementation details, architecture, edge cases, monitoring and failure handling that you actually worked with." : d.key === "specificity" ? "Replace broad claims with one real example, the tools used, your actions and observable evidence." : "Use a clear Situation → Action → Decision → Result structure; be concise and explain technical terms plainly."}</p></div></article>)}</div>
+          <div className="report-gap-box"><b>Priority skills from this interview</b><p>{(report.priority_gaps || []).join(" · ") || "No skill gap fell below the current threshold. Keep practising with harder questions."}</p></div>
+        </section>
+        <section className="card report-section">
+          <div className="eyebrow">ANSWER-BY-ANSWER REVIEW</div><h2>Feedback you can revisit</h2>
+          {answeredQuestions.length ? <div className="report-answer-list">{answeredQuestions.map(({question, evaluation}, i) => <details className="report-answer" key={question.id + "-" + i}><summary><span>{i+1}. {question.skill} · {question.category}</span><strong>{evaluation!.score}/100</strong><small>{question.question}</small></summary><div className="report-answer-body"><b>Your answer</b><p>{(i < asked.length && evaluation) ? (answer && i === asked.length - 1 ? answer : "Review your saved session history for the full response.") : ""}</p><b>Strengths</b>{(evaluation!.strengths || []).length ? (evaluation!.strengths || []).map((s, j) => <p key={j}>✓ {s}</p>) : <p>None recorded.</p>}<b>Improve next time</b>{(evaluation!.weaknesses || []).length ? (evaluation!.weaknesses || []).map((w, j) => <p key={j}>→ {w}</p>) : <p>No specific gaps were returned.</p>{evaluation!.follow_up_question && <p><b>Practice prompt:</b> {evaluation!.follow_up_question}</p>}</div></details>)}</div> : <p>No individual answers are available in this report.</p>}
+          <div className="report-actions"><button onClick={() => { setPlan(null); setReport(null); setFeedback(null); setAnswer(""); setAsked([]); setEvals([]); setSessionId(null); setIndex(0); }}>Start another interview</button><button className="report-secondary" onClick={() => window.print()}>Save this report as PDF</button></div>
+        </section>
+        <p className="report-disclaimer">CareerCoach AI provides practice feedback, not a guarantee of interview performance. Scores can vary between AI evaluations; use the evidence and explanations alongside the number.</p>
       </main>
     );
   }
