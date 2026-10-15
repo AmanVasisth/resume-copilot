@@ -105,17 +105,22 @@ def evaluate(req: EvaluateAnswerRequest):
         result = evaluate_answer(req.question, req.answer, req.candidate)
     else:
         llm_result = evaluate_with_llm(req.question, req.answer, req.candidate)
-        if llm_result:
-            try:
-                provider_used = llm_result.get(
-                    "_evaluation_provider",
-                    "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini",
-                )
-                result = apply_rubric_result(llm_result, provider_used)
-            except Exception:
-                result = evaluate_answer(req.question, req.answer, req.candidate)
-        else:
-            result = evaluate_answer(req.question, req.answer, req.candidate)
+        if not llm_result:
+            raise HTTPException(
+                status_code=503,
+                detail="AI evaluation is temporarily unavailable. Your answer has not been scored; please retry shortly.",
+            )
+        try:
+            provider_used = llm_result.get(
+                "_evaluation_provider",
+                "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini",
+            )
+            result = apply_rubric_result(llm_result, provider_used)
+        except Exception:
+            raise HTTPException(
+                status_code=503,
+                detail="AI evaluation returned an invalid response. Your answer has not been scored; please retry.",
+            )
     # Adaptive probing is only needed for a weak answer, and only one level deep.
     if req.question.id.startswith("followup-") or result.score >= 65:
         result.follow_up_question = None
