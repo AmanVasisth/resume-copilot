@@ -18,8 +18,8 @@ export default function Home(){
  const[recommendations,setRecommendations]=useState<any>(null),[recommendationsLoading,setRecommendationsLoading]=useState(false);
  const recognition=useRef<any>(null);
  const skillCatalog=["SQL","Python","Power BI","Qlik Sense","Databricks","Snowflake","Azure","Tableau","Machine Learning","GenAI","LangChain","Power Automate","Excel"];
- const resumeSkills=skillCatalog.filter(s=>new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g,"\\ const resumeSkills=skillCatalog.filter(s=>new RegExp(s.replace(/[.*+?^${}()|[\\]\\]/g,"\\ const recognition=useRef<any>(null);"),"i").test(resume));"),"i").test(resume));
- const jdSkills=skillCatalog.filter(s=>new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g,"\\ const jdSkills=skillCatalog.filter(s=>new RegExp(s.replace(/[.*+?^${}()|[\\]\\]/g,"\\ const recognition=useRef<any>(null);"),"i").test(jd));"),"i").test(jd));
+ const resumeSkills=skillCatalog.filter(s=>resume.toLowerCase().includes(s.toLowerCase()));
+ const jdSkills=skillCatalog.filter(s=>jd.toLowerCase().includes(s.toLowerCase()));
 
  useEffect(()=>{if(typeof window==="undefined")return;let key=window.localStorage.getItem("careercoach_candidate_key");if(!key){key="candidate-"+Math.random().toString(36).slice(2)+Date.now().toString(36);window.localStorage.setItem("careercoach_candidate_key",key)}setCandidateKey(key);const R=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(!R){return}const r=new R();r.continuous=true;r.interimResults=true;r.lang="en-IN";r.onresult=(e:any)=>{let finalText="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)finalText+=e.results[i][0].transcript+" "}if(finalText)setAnswer(a=>(a+" "+finalText).trim())};r.onerror=()=>{setListening(false);setVoiceError("Voice recognition stopped. You can continue with typing.")};r.onend=()=>setListening(false);recognition.current=r;return()=>{try{r.stop()}catch{}}},[]);
 
