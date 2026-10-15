@@ -33,10 +33,26 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
                   "response_format":{"type":"json_object"}, "temperature":0.2},
             timeout=45,
         )
-        r.raise_for_status()
-        return json.loads(r.json()["choices"][0]["message"]["content"])
+        if not r.ok:
+            # Log status and provider's safe error message, never the API key.
+            try:
+                detail = r.json().get("error", {}).get("message", "No error message returned")
+            except Exception:
+                detail = "No error message returned"
+            logger.warning("OpenRouter API HTTP %s: %s", r.status_code, detail[:500])
+            return None
+        try:
+            body = r.json()
+            content = body["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                logger.warning("OpenRouter returned non-text message content.")
+                return None
+            return json.loads(content)
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            logger.warning("OpenRouter response format invalid (%s).", type(exc).__name__)
+            return None
     except Exception as exc:
-        logger.warning("LLM evaluation unavailable (%s); using fallback evaluator.", type(exc).__name__)
+        logger.warning("OpenRouter request failed (%s).", type(exc).__name__)
         return None
 
 def _gemini(prompt: str) -> dict[str, Any] | None:
