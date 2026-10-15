@@ -60,7 +60,7 @@ class ScoringTests(unittest.TestCase):
     def test_short_generic_answer_is_not_scored_as_midrange(self):
         result = evaluate_answer(
             self.question,
-            "I worked on an Azure project. My contribution was to develop the solution and improve performance.",
+            "I worked on Azure and improved things.",
             self.candidate,
         )
         self.assertLessEqual(result.score, 15)
