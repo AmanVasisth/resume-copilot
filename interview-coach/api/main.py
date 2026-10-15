@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
 from .engine import build_profile, make_questions, evaluate_answer
 from .llm import evaluate_with_llm
+from .scoring import apply_rubric_result
 from .adaptive import InterviewState, select_next_question, readiness_report
 from .resume_parser import extract_resume_text
 from . import database
@@ -106,22 +107,11 @@ def evaluate(req: EvaluateAnswerRequest):
         llm_result = evaluate_with_llm(req.question, req.answer, req.candidate)
         if llm_result:
             try:
-                llm_payload = dict(llm_result)
-                provider_used = llm_payload.pop("_evaluation_provider", "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini")
-                result = AnswerEvaluation.model_validate({**llm_payload, "evaluation_provider": provider_used})
-                # Enforce the same weighted score regardless of which provider answered.
-                result.score = round(
-                    0.20 * result.relevance
-                    + 0.20 * result.technical_correctness
-                    + 0.15 * result.ownership
-                    + 0.15 * result.reasoning
-                    + 0.10 * result.validation
-                    + 0.10 * result.depth
-                    + 0.05 * result.specificity
-                    + 0.05 * result.communication
+                provider_used = llm_result.get(
+                    "_evaluation_provider",
+                    "openrouter" if os.getenv("LLM_PROVIDER") == "openrouter" else "gemini",
                 )
-                result.evaluation_method = "llm_rubric"
-                result.confidence = "medium"
+                result = apply_rubric_result(llm_result, provider_used)
             except Exception:
                 result = evaluate_answer(req.question, req.answer, req.candidate)
         else:
