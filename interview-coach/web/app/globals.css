@@ -158,3 +158,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .report-disclaimer{font-size:11px;line-height:1.6;color:#7a849b;padding:0 8px;margin:18px 0}
 @media(max-width:700px){.report-shell{padding:16px 12px 48px}.report-score-row{grid-template-columns:1fr}.report-stat-grid{grid-template-columns:1fr}.report-skill-list,.report-dimensions{grid-template-columns:1fr}.report-section{padding:20px}.report-section h2{font-size:22px}.report-actions{display:grid}.report-actions button{width:100%}}
 @media print{body{background:#fff}.report-shell{max-width:none;padding:0}.report-shell header .header-actions,.report-actions,.report-shell .report-secondary{display:none!important}.report-shell .card{box-shadow:none;break-inside:avoid;border:1px solid #ddd;margin-top:12px}.report-answer details{break-inside:avoid}.report-shell .report-disclaimer{color:#555}}
+
+
+/* Ensure collapsed answer accordions print their complete review content */
+@media print {
+  .report-answer-list { display: block !important; }
+  .report-answer,
+  .report-answer details,
+  details.report-answer { overflow: visible !important; break-inside: auto !important; page-break-inside: auto !important; }
+  .report-answer > .report-answer-body,
+  .report-answer:not([open]) > .report-answer-body,
+  details.report-answer:not([open]) > .report-answer-body { display: block !important; visibility: visible !important; }
+  .report-answer summary { break-after: avoid !important; }
+  .report-answer-body { padding-top: 3mm !important; }
+}
