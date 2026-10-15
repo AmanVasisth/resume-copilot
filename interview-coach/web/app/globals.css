@@ -172,3 +172,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .report-answer summary { break-after: avoid !important; }
   .report-answer-body { padding-top: 3mm !important; }
 }
+
+
+/* Always-visible answer review for screen and PDF */
+.report-answer-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 15px 8px}
+.report-answer-heading>span{font-size:11px;font-weight:800;color:#6254d9}
+.report-answer-heading>strong{font-size:13px;white-space:nowrap}
+.report-question-text{padding:0 15px 12px;margin:0!important;font-size:12px;line-height:1.55;color:#475467}
+.report-answer .report-answer-body{display:block!important;padding:12px 15px 15px;border-top:1px solid #edf0f6}
+@media print{
+ .report-answer-list{display:block!important}
+ .report-answer{display:block!important;overflow:visible!important;break-inside:avoid-page!important;page-break-inside:avoid!important}
+ .report-answer-heading,.report-question-text,.report-answer-body{display:block;visibility:visible!important}
+ .report-answer-heading{display:flex!important}
+ .report-answer-body p{white-space:normal;overflow-wrap:anywhere}
+}
