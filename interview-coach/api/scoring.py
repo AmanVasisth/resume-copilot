@@ -53,8 +53,15 @@ def apply_rubric_result(payload: dict, provider: str) -> AnswerEvaluation:
     clean = dict(payload)
     clean.pop("_evaluation_provider", None)
 
+    missing = [field for field in SCORE_FIELDS if field not in clean]
+    if missing:
+        raise ValueError("AI rubric output is missing required score fields: " + ", ".join(missing))
+
     for field in SCORE_FIELDS:
-        clean[field] = _as_score(clean.get(field, 0))
+        clean[field] = _as_score(clean[field])
+
+    if all(clean[field] == 0 for field in SCORE_FIELDS):
+        raise ValueError("AI rubric output contains zero for every dimension; refusing to treat this as a valid evaluation")
 
     clean["strengths"] = _as_text_list(clean.get("strengths"))
     clean["weaknesses"] = _as_text_list(clean.get("weaknesses"))
