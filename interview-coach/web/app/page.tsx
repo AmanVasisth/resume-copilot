@@ -84,6 +84,7 @@ export default function Home(){
           )}
           <textarea value={answer} onChange={e => setAnswer(e.target.value)} placeholder={voice ? "Your spoken answer will appear here…" : "Answer as if you are in the real interview..."} />
           {voice && voiceError && <p className="error">{voiceError}</p>}
+          {startError && <p className="error" role="alert">{startError}</p>}
           {!feedback ? (
             <button disabled={loading || !answer.trim()} onClick={submit}>{loading ? "Evaluating…" : "Submit answer"}</button>
           ) : (
