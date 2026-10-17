@@ -70,12 +70,13 @@ def apply_rubric_result(payload: dict, provider: str) -> AnswerEvaluation:
     if not isinstance(clean.get("next_focus"), str) or not clean["next_focus"].strip():
         clean["next_focus"] = "specificity"
 
+    # Ignore the provider's overall score completely. Compute the canonical score
+    # from validated dimensions before Pydantic validation, so an invalid provider
+    # score (e.g. 999 or a string) cannot reject otherwise valid dimension scores.
+    clean["score"] = round(sum(clean[name] * weight for name, weight in WEIGHTS.items()))
     clean.update({
         "evaluation_provider": provider if provider in {"gemini", "openrouter"} else "heuristic",
         "evaluation_method": "llm_rubric",
         "confidence": "medium",
     })
-    result = AnswerEvaluation.model_validate(clean)
-    weighted = sum(getattr(result, name) * weight for name, weight in WEIGHTS.items())
-    result.score = round(weighted)
-    return result
+    return AnswerEvaluation.model_validate(clean)
