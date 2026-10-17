@@ -43,6 +43,7 @@ def init_db():
             conn.execute("ALTER TABLE sessions ADD COLUMN plan_json TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_candidate_date ON sessions(candidate_key, created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_answers_session ON answers(session_id, id)")
+        conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_answers_session_question ON answers(session_id, question_id)""")
         conn.commit()
 
 def create_session(candidate_key: str, target_role: str, years_experience: float, mode: str, plan: dict | None = None) -> dict:
@@ -55,19 +56,73 @@ def create_session(candidate_key: str, target_role: str, years_experience: float
         conn.commit()
         return get_session(int(cur.lastrowid), candidate_key)
 
-def save_answer(session_id: int, candidate_key: str, question: dict, answer: str, evaluation: dict) -> dict:
+
+def save_answer(
+    session_id: int,
+    candidate_key: str,
+    question: dict,
+    answer: str,
+    evaluation: dict,
+) -> dict:
     now = datetime.now(timezone.utc).isoformat()
+
     with _connect() as conn:
-        owner = conn.execute("SELECT id FROM sessions WHERE id=? AND candidate_key=?", (session_id, candidate_key)).fetchone()
+        owner = conn.execute(
+            "SELECT id FROM sessions WHERE id=? AND candidate_key=?",
+            (session_id, candidate_key),
+        ).fetchone()
+
         if not owner:
-            raise ValueError("Interview session not found for this candidate.")
-        conn.execute(
-            """INSERT INTO answers(session_id,question_id,question,skill,category,answer,score,evaluation_json,created_at)
-            VALUES(?,?,?,?,?,?,?,?,?)""",
-            (session_id, question["id"], question["question"], question["skill"], question["category"], answer, int(evaluation["score"]), json.dumps(evaluation), now),
+            raise ValueError(
+                "Interview session not found for this candidate."
+            )
+
+        existing = conn.execute(
+            """
+            SELECT id FROM answers
+            WHERE session_id=? AND question_id=?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (session_id, question["id"]),
+        ).fetchone()
+
+        values = (
+            question["question"],
+            question["skill"],
+            question["category"],
+            answer,
+            int(evaluation["score"]),
+            json.dumps(evaluation),
         )
+
+        if existing:
+            conn.execute(
+                """
+                UPDATE answers
+                SET question=?, skill=?, category=?, answer=?,
+                    score=?, evaluation_json=?, created_at=?
+                WHERE id=?
+                """,
+                (*values, now, existing["id"]),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO answers(
+                    session_id, question_id, question, skill,
+                    category, answer, score, evaluation_json, created_at
+                ) VALUES(?,?,?,?,?,?,?,?,?)
+                """,
+                (session_id, question["id"], *values, now),
+            )
+
         conn.commit()
-        return {"saved": True, "session_id": session_id}
+
+        return {
+            "saved": True,
+            "session_id": session_id,
+            "question_id": question["id"],
+        }
 
 def complete_session(session_id: int, candidate_key: str, overall_score: int) -> dict:
     now = datetime.now(timezone.utc).isoformat()
