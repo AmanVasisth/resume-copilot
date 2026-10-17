@@ -155,6 +155,12 @@ Calibration checks:
 - Strong, specific, technically sound answer with clear personal ownership, trade-offs, completed validation and evidence: usually 70-90.
 - 90+ requires exceptional, detailed, defensible evidence; polished generic answers do not qualify.
 For project questions, assess business problem, personal contribution, design decision, trade-off, completed validation and actual outcome. Missing one dimension lowers that dimension; do not treat one missing metric as proof the entire answer is worthless.
+Technical-error calibration:
+- If the answer reverses the core responsibilities of named services, or makes a central technical claim that is clearly false, technical_correctness must be 0-10 and reasoning must be no higher than 20 unless the answer explicitly corrects itself.
+- If the central architecture is technically wrong, the overall score should normally stay at or below 20. Do not award points for length, confident tone, or invented success metrics.
+- Unsupported absolute claims such as "100% accurate" without evidence must not receive validation or specificity credit; score those dimensions at 0-10 for that claim.
+- A vague but not demonstrably incorrect answer can score low, but a detailed answer built around a confidently false central claim must not score higher merely because it contains more words.
+- For Azure RAG answers, Azure AI Search provides indexing/search/retrieval; Azure OpenAI provides model inference/generation. Do not accept the reverse description as technically correct.
 A correct technical term is a positive signal but not proof of hands-on experience. Use candidate profile only as context; resume skills do not prove this answer's claims. Praise only evidence-backed strengths. If no genuine strength exists, return an empty strengths array.
 Return integers 0-100 for every score and exactly these keys:
 {{
