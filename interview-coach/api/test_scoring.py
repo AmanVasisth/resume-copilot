@@ -57,7 +57,7 @@ class RubricScoringTests(unittest.TestCase):
 
     def test_text_fields_accept_string_and_list_provider_shapes(self):
         payload = valid_payload(
-            strengths="Clear architecture\\n- Mentions validation",
+            strengths="Clear architecture\n- Mentions validation",
             weaknesses=["No baseline metric", "Ownership unclear"],
         )
         result = apply_rubric_result(payload, "gemini")
