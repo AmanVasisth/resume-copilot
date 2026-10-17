@@ -187,3 +187,52 @@ button:disabled{opacity:.45;cursor:not-allowed}
  .report-answer-heading{display:flex!important}
  .report-answer-body p{white-space:normal;overflow-wrap:anywhere}
 }
+
+
+/* Compact report pagination: keep the practice plan and answer review readable in fewer pages */
+@media print {
+  @page { size: A4; margin: 9mm; }
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body:before { display: none !important; }
+  .report-shell { width: 100% !important; max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  .report-shell header { margin: 0 0 4mm !important; }
+  .report-shell .card {
+    padding: 5mm !important;
+    margin: 0 0 4mm !important;
+    border-radius: 3mm !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .report-shell .report-hero { padding: 5mm !important; }
+  .report-shell .score { font-size: 42pt !important; }
+  .report-score-row { gap: 4mm !important; margin-top: 3mm !important; }
+  .report-status { padding: 3mm !important; gap: 2mm !important; }
+  .report-stat-grid { gap: 2mm !important; margin-top: 4mm !important; }
+  .report-stat-grid>div { padding: 3mm !important; gap: 1mm !important; }
+  .report-stat-grid strong { font-size: 11pt !important; }
+  .report-section { margin-top: 0 !important; }
+  .report-section h2 { font-size: 17pt !important; margin: 2mm 0 !important; }
+  .report-muted { font-size: 8pt !important; line-height: 1.35 !important; margin: 2mm 0 !important; }
+  .report-skill-list { gap: 2mm 5mm !important; margin: 3mm 0 !important; }
+  .report-track { height: 4px !important; margin: 1.5mm 0 !important; }
+  .report-subheading { margin: 4mm 0 2mm !important; font-size: 10pt !important; }
+  .report-dimensions { gap: 2mm !important; }
+  .report-dimension { padding: 2.5mm !important; }
+  .report-practice-list { gap: 2mm !important; margin-top: 3mm !important; }
+  .report-practice-card { padding: 3mm !important; grid-template-columns: 7mm 1fr !important; gap: 2mm !important; }
+  .report-practice-number { width: 6mm !important; height: 6mm !important; border-radius: 2mm !important; }
+  .report-practice-card p, .report-gap-box p { font-size: 8pt !important; line-height: 1.35 !important; margin-top: 1.5mm !important; }
+  .report-gap-box { padding: 3mm !important; margin-top: 3mm !important; }
+  .report-answer-list { gap: 2mm !important; margin-top: 3mm !important; }
+  .report-answer { overflow: visible !important; break-inside: auto !important; page-break-inside: auto !important; }
+  .report-answer-heading { padding: 3mm 3mm 1mm !important; }
+  .report-question-text { padding: 0 3mm 2mm !important; font-size: 8pt !important; line-height: 1.35 !important; }
+  .report-answer .report-answer-body { padding: 2mm 3mm 3mm !important; }
+  .report-answer-body>b { margin: 2mm 0 1mm !important; font-size: 8pt !important; }
+  .report-answer-body p { font-size: 8pt !important; line-height: 1.35 !important; margin: 1mm 0 !important; }
+  .report-disclaimer { margin: 2mm 0 0 !important; padding: 0 !important; font-size: 7pt !important; }
+  .report-actions, .report-shell header .header-actions { display: none !important; }
+  .report-answer-heading, .report-question-text, .report-answer-body { visibility: visible !important; }
+}
