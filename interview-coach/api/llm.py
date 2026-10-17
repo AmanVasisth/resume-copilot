@@ -17,6 +17,40 @@ Return ONLY valid JSON matching the requested schema."""
 def _provider():
     return os.getenv("LLM_PROVIDER", "none").lower()
 
+def _parse_json_object(content: Any) -> dict[str, Any] | None:
+    """Parse provider JSON even when a model wraps it in Markdown fences or prose."""
+    if isinstance(content, list):
+        # Some compatible endpoints return content as typed text blocks.
+        content = "".join(
+            item.get("text", "") for item in content
+            if isinstance(item, dict) and isinstance(item.get("text"), str)
+        )
+    if not isinstance(content, str) or not content.strip():
+        return None
+    text = content.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        # Recover a JSON object if the model added a short preamble/trailer.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            parsed = json.loads(text[start:end + 1])
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            return None
+
+
 def _openrouter(prompt: str) -> dict[str, Any] | None:
     key = os.getenv("OPENROUTER_API_KEY")
     # OpenRouter uses a separate model setting so it can act as a fallback
@@ -43,12 +77,22 @@ def _openrouter(prompt: str) -> dict[str, Any] | None:
             return None
         try:
             body = r.json()
-            content = body["choices"][0]["message"]["content"]
-            if not isinstance(content, str):
-                logger.warning("OpenRouter returned non-text message content.")
+            choices = body.get("choices") or []
+            if not choices:
+                logger.warning("OpenRouter response contained no choices.")
                 return None
-            return json.loads(content)
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            message = choices[0].get("message") or {}
+            parsed = _parse_json_object(message.get("content"))
+            if parsed is not None:
+                return parsed
+            # Do not log prompts or candidate answers; diagnostic metadata is enough.
+            logger.warning(
+                "OpenRouter response format invalid (content_type=%s, finish_reason=%s).",
+                type(message.get("content")).__name__,
+                choices[0].get("finish_reason", "unknown"),
+            )
+            return None
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
             logger.warning("OpenRouter response format invalid (%s).", type(exc).__name__)
             return None
     except Exception as exc:
