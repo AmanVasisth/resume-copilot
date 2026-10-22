@@ -299,6 +299,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .resume-bullet-review{min-width:0;border:1px solid #e7e9f4;border-radius:13px;background:#fcfcff;padding:13px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .resume-bullet-review>p{font-size:11px;line-height:1.65;color:#475467;margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .resume-bullet-review>.secondary-button{margin-top:auto;font-size:10px;padding:8px 10px}
+.resume-bullet-draft-label{display:flex;flex-direction:column;gap:7px;margin:10px 0;color:#343c55;font-size:11px;font-weight:700}
+.resume-bullet-draft-label textarea{width:100%;min-height:92px;resize:vertical;border:1px solid #dfe3f2;border-radius:10px;padding:11px 12px;background:#fff;color:#273047;font:500 12px/1.65 inherit;outline:none}
+.resume-bullet-draft-label textarea:focus{border-color:#7865ff;box-shadow:0 0 0 3px #7865ff1c}
+.resume-bullet-actions{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0}
+.resume-bullet-guidance>p{font-size:11px;line-height:1.6;color:#69738c;margin:7px 0}
+.resume-bullet-guidance>small{display:block;font-size:10px;line-height:1.6;color:#7a849e}
 .resume-bullet-guidance{width:100%;border-top:1px solid #e8eaf4;padding-top:11px}
 .resume-bullet-guidance>b{font-size:11px;color:#5148c9}
 .resume-bullet-guidance ul{padding-left:17px;margin:8px 0 12px}
