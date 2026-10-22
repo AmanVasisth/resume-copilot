@@ -209,3 +209,22 @@ Candidate answer:
             return result
         return None
     return None
+
+
+def rewrite_resume_bullet(original: str, draft: str = "", job_description: str = "") -> dict[str, Any] | None:
+    """Suggest an evidence-preserving resume bullet; never invent candidate facts."""
+    prompt = f"""Improve this resume bullet for clarity, specificity, and professional impact. Use ONLY facts supported by the original bullet and the user's draft. Do not invent metrics, tools, ownership, scale, employers, or outcomes. If important evidence is missing, state what the candidate should supply instead of fabricating it. Keep the improved bullet concise and ATS-readable.\nReturn JSON with exactly these keys: improved_bullet (string), missing_evidence (array of strings), changes_made (array of strings), needs_user_verification (array of strings). If the original is ambiguous, preserve that ambiguity and ask for clarification in missing_evidence.\nOriginal bullet: {original}\nUser draft: {draft or '(not provided)'}\nTarget job description (optional): {job_description or '(not provided)'}"""
+    provider = _provider()
+    result = None
+    if provider == "openrouter":
+        result = _openrouter(prompt)
+    elif provider == "gemini":
+        result = _gemini(prompt)
+        if result is None and os.getenv("OPENROUTER_API_KEY"):
+            result = _openrouter(prompt)
+    if not isinstance(result, dict) or not isinstance(result.get("improved_bullet"), str) or not result["improved_bullet"].strip():
+        return None
+    for key in ("missing_evidence", "changes_made", "needs_user_verification"):
+        if not isinstance(result.get(key), list):
+            result[key] = []
+    return result
