@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
 from .engine import build_profile, make_questions, evaluate_answer
@@ -45,8 +45,7 @@ async def extract_resume(file: UploadFile = File(...)):
 
 @app.post("/v1/resume/export")
 async def export_revised_resume(file: UploadFile = File(...), approved_bullets: str = ""):
-    """Export approved resume edits. DOCX input keeps paragraph styles where possible;
-    PDF/TXT input becomes a clean, editable DOCX because PDF layout is not reliably editable."""
+    """Export approved edits to a polished, editable DOCX resume."""
     try:
         content = await file.read()
         ext = Path(file.filename or "").suffix.lower()
@@ -63,7 +62,6 @@ async def export_revised_resume(file: UploadFile = File(...), approved_bullets: 
                     continue
                 for paragraph in doc.paragraphs:
                     if paragraph.text.strip() == original:
-                        # Preserve paragraph style and the first run's formatting.
                         if paragraph.runs:
                             paragraph.runs[0].text = replacement
                             for run in paragraph.runs[1:]:
@@ -71,37 +69,81 @@ async def export_revised_resume(file: UploadFile = File(...), approved_bullets: 
                         else:
                             paragraph.add_run(replacement)
                         break
-            output_name = "careercoach-revised-resume.docx"
         else:
-            text = extract_resume_text(file.filename or "", content)
-            if not text:
+            resume_text = extract_resume_text(file.filename or "", content)
+            if not resume_text.strip():
                 raise ValueError("No readable resume text found.")
             for item in replacements:
                 original = str(item.get("original", "")).strip()
                 replacement = str(item.get("replacement", "")).strip()
                 if original and replacement:
-                    text = text.replace(original, replacement, 1)
+                    resume_text = resume_text.replace(original, replacement, 1)
+
+            # Build a consistent, recruiter-friendly DOCX instead of dumping every
+            # extracted PDF line into unformatted paragraphs. Text is not invented.
             doc = Document()
             section = doc.sections[0]
-            section.top_margin = Inches(0.65)
-            section.bottom_margin = Inches(0.65)
-            section.left_margin = Inches(0.75)
-            section.right_margin = Inches(0.75)
-            normal = doc.styles["Normal"]
+            section.top_margin = Inches(0.48)
+            section.bottom_margin = Inches(0.48)
+            section.left_margin = Inches(0.62)
+            section.right_margin = Inches(0.62)
+
+            styles = doc.styles
+            normal = styles["Normal"]
             normal.font.name = "Arial"
-            normal.font.size = Pt(9.5)
-            for raw_line in text.splitlines():
-                line = raw_line.strip()
-                if not line:
-                    continue
-                if re.match(r"^(professional summary|summary|experience|professional experience|work experience|projects|technical skills|skills|education|certifications|achievements)$", line, re.I):
+            normal.font.size = Pt(9)
+            normal.font.color.rgb = RGBColor(38, 48, 65)
+            normal.paragraph_format.space_after = Pt(2)
+            normal.paragraph_format.line_spacing = 1.05
+
+            heading_names = {
+                "professional summary", "profile summary", "summary",
+                "experience", "professional experience", "work experience",
+                "projects", "key projects", "technical skills", "skills",
+                "core competencies", "education", "certifications", "awards",
+                "achievements", "key result areas"
+            }
+            lines = [re.sub(r"^\s*[•▪●]\s*", "", line).strip()
+                     for line in resume_text.splitlines()]
+            lines = [line for line in lines if line]
+            if not lines:
+                raise ValueError("No readable resume text found.")
+
+            # Name and contact line are highlighted, while the original wording
+            # and sequence are retained as far as text extraction allows.
+            title = doc.add_paragraph()
+            title.paragraph_format.space_after = Pt(2)
+            title_run = title.add_run(lines[0])
+            title_run.bold = True
+            title_run.font.name = "Arial"
+            title_run.font.size = Pt(19)
+            title_run.font.color.rgb = RGBColor(37, 49, 78)
+
+            for line in lines[1:]:
+                if line.lower() in heading_names:
                     p = doc.add_paragraph()
+                    p.paragraph_format.space_before = Pt(7)
+                    p.paragraph_format.space_after = Pt(3)
+                    run = p.add_run(line.upper())
+                    run.bold = True
+                    run.font.name = "Arial"
+                    run.font.size = Pt(10.5)
+                    run.font.color.rgb = RGBColor(79, 70, 229)
+                elif re.match(r"^(Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|GenAI|AI Engineer|Data Analyst).{0,180}\|\s*", line, re.I):
+                    p = doc.add_paragraph()
+                    p.paragraph_format.space_before = Pt(4)
+                    p.paragraph_format.keep_with_next = True
                     run = p.add_run(line)
                     run.bold = True
-                    run.font.size = Pt(12)
+                    run.font.color.rgb = RGBColor(37, 49, 78)
                 else:
-                    doc.add_paragraph(line)
-            output_name = "careercoach-revised-resume.docx"
+                    p = doc.add_paragraph()
+                    p.paragraph_format.keep_together = True
+                    if line.startswith(("-", "•", "▪", "●")):
+                        p.paragraph_format.left_indent = Inches(0.16)
+                        p.add_run("• " + line.lstrip("-•▪● "))
+                    else:
+                        p.add_run(line)
 
         stream = BytesIO()
         doc.save(stream)
@@ -109,7 +151,7 @@ async def export_revised_resume(file: UploadFile = File(...), approved_bullets: 
         return StreamingResponse(
             stream,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f'attachment; filename="{output_name}"'},
+            headers={"Content-Disposition": 'attachment; filename="careercoach-revised-resume.docx"'},
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not export revised resume: {exc}")
