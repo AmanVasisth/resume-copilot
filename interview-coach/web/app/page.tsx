@@ -43,6 +43,18 @@ export default function Home(){
 
  async function uploadResume(file:File){setUploadError("");setUploading(true);try{const fd=new FormData();fd.append("file",file);const r=await fetch(API+"/v1/resume/extract",{method:"POST",body:fd});const out=await r.json();if(!r.ok)throw new Error(out.detail||"Could not read resume");setResume(out.text||"");}catch(e:any){setUploadError(e.message||"Could not read resume")}finally{setUploading(false)}}
  async function scanResumeFile(file:File){setInsightOriginalFile(file);setInsightError("");setInsightLoading(true);try{const fd=new FormData();fd.append("file",file);const r=await fetch(API+"/v1/resume/extract",{method:"POST",body:fd});const out=await r.json();if(!r.ok)throw new Error(out.detail||"Could not read resume");setInsightResume(out.text||"");setInsightResult(null)}catch(e:any){setInsightError(e.message||"Could not read resume")}finally{setInsightLoading(false)}}
+ async function downloadRevisedResume(){
+  if(!Object.keys(approvedBullets).length){setInsightError("Approve at least one revised bullet before exporting.");return}
+  setInsightError("");
+  try{
+    const source=insightOriginalFile||new File([insightResume],"resume.txt",{type:"text/plain"});
+    const fd=new FormData();fd.append("file",source);fd.append("approved_bullets",JSON.stringify(Object.values(approvedBullets)));
+    const response=await fetch(API+"/v1/resume/export",{method:"POST",body:fd});
+    if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.detail||"Could not export revised resume")}
+    const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="careercoach-revised-resume.docx";document.body.appendChild(a);a.click();a.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e:any){setInsightError(e.message||"Could not export revised resume")}
+ }
  function analyzeResume(){
   const text=insightResume.trim();
   if(text.length<80){setInsightError("Please upload or paste a fuller resume (at least 80 characters) so the scan has enough evidence.");return}
