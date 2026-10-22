@@ -3,7 +3,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
 from .engine import build_profile, make_questions, evaluate_answer
-from .llm import evaluate_with_llm
+from .llm import evaluate_with_llm, rewrite_resume_bullet
 from .scoring import apply_rubric_result
 from .adaptive import InterviewState, select_next_question, readiness_report
 from .resume_parser import extract_resume_text
@@ -37,6 +37,20 @@ async def extract_resume(file: UploadFile = File(...)):
         return {"filename": file.filename, "text": text}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+@app.post("/v1/resume/rewrite-bullet")
+def rewrite_bullet(payload: dict):
+    original = str(payload.get("original", "")).strip()
+    draft = str(payload.get("draft", "")).strip()
+    job_description = str(payload.get("job_description", "")).strip()
+    if not original:
+        raise HTTPException(status_code=400, detail="A resume bullet is required.")
+    if len(original) > 3000 or len(draft) > 3000 or len(job_description) > 12000:
+        raise HTTPException(status_code=413, detail="Please shorten the bullet or job description and try again.")
+    result = rewrite_resume_bullet(original, draft, job_description)
+    if not result:
+        raise HTTPException(status_code=503, detail="AI rewriting is temporarily unavailable. Check the configured AI provider and retry.")
+    return result
 
 @app.post("/v1/interview/plan", response_model=InterviewPlan)
 def create_plan(req: InterviewRequest):
