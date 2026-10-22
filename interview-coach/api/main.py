@@ -1,5 +1,10 @@
-import os
+import os, json, re
+from io import BytesIO
+from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
+from docx import Document
+from docx.shared import Inches, Pt
 from fastapi.middleware.cors import CORSMiddleware
 from .models import InterviewRequest, InterviewPlan, EvaluateAnswerRequest, AnswerEvaluation, NextQuestionRequest, NextQuestionResponse, Question
 from .engine import build_profile, make_questions, evaluate_answer
@@ -37,6 +42,77 @@ async def extract_resume(file: UploadFile = File(...)):
         return {"filename": file.filename, "text": text}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+@app.post("/v1/resume/export")
+async def export_revised_resume(file: UploadFile = File(...), approved_bullets: str = ""):
+    """Export approved resume edits. DOCX input keeps paragraph styles where possible;
+    PDF/TXT input becomes a clean, editable DOCX because PDF layout is not reliably editable."""
+    try:
+        content = await file.read()
+        ext = Path(file.filename or "").suffix.lower()
+        replacements = json.loads(approved_bullets or "[]")
+        if not isinstance(replacements, list):
+            raise ValueError("Approved bullet changes must be a list.")
+
+        if ext == ".docx":
+            doc = Document(BytesIO(content))
+            for item in replacements:
+                original = str(item.get("original", "")).strip()
+                replacement = str(item.get("replacement", "")).strip()
+                if not original or not replacement:
+                    continue
+                for paragraph in doc.paragraphs:
+                    if paragraph.text.strip() == original:
+                        # Preserve paragraph style and the first run's formatting.
+                        if paragraph.runs:
+                            paragraph.runs[0].text = replacement
+                            for run in paragraph.runs[1:]:
+                                run.text = ""
+                        else:
+                            paragraph.add_run(replacement)
+                        break
+            output_name = "careercoach-revised-resume.docx"
+        else:
+            text = extract_resume_text(file.filename or "", content)
+            if not text:
+                raise ValueError("No readable resume text found.")
+            for item in replacements:
+                original = str(item.get("original", "")).strip()
+                replacement = str(item.get("replacement", "")).strip()
+                if original and replacement:
+                    text = text.replace(original, replacement, 1)
+            doc = Document()
+            section = doc.sections[0]
+            section.top_margin = Inches(0.65)
+            section.bottom_margin = Inches(0.65)
+            section.left_margin = Inches(0.75)
+            section.right_margin = Inches(0.75)
+            normal = doc.styles["Normal"]
+            normal.font.name = "Arial"
+            normal.font.size = Pt(9.5)
+            for raw_line in text.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if re.match(r"^(professional summary|summary|experience|professional experience|work experience|projects|technical skills|skills|education|certifications|achievements)$", line, re.I):
+                    p = doc.add_paragraph()
+                    run = p.add_run(line)
+                    run.bold = True
+                    run.font.size = Pt(12)
+                else:
+                    doc.add_paragraph(line)
+            output_name = "careercoach-revised-resume.docx"
+
+        stream = BytesIO()
+        doc.save(stream)
+        stream.seek(0)
+        return StreamingResponse(
+            stream,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{output_name}"'},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not export revised resume: {exc}")
 
 @app.post("/v1/resume/rewrite-bullet")
 def rewrite_bullet(payload: dict):
