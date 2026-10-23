@@ -79,6 +79,20 @@ async def export_revised_resume(file: UploadFile = File(...), approved_bullets: 
                 if original and replacement:
                     resume_text = resume_text.replace(original, replacement, 1)
 
+            # Repair frequent PDF text-extraction artefacts without adding claims.
+            resume_text = re.sub(r"(?i)g\\s+mail\\.com", "gmail.com", resume_text)
+            resume_text = re.sub(r"(?i)Microsof\\s+t", "Microsoft", resume_text)
+            for broken, fixed in {
+                "Develop ed": "Developed", "develop ed": "developed",
+                "cont rolled": "controlled", "app lication": "application",
+                "reason ing": "reasoning", "docume nt": "document",
+                "groundn ess": "groundedness", "deploy ment": "deployment",
+                "sou rce": "source", "ve ctor": "vector", "Microsof t": "Microsoft",
+                "DevO ps": "DevOps", "wit h": "with", "Po wer BI": "Power BI",
+            }.items():
+                resume_text = resume_text.replace(broken, fixed)
+            resume_text = re.sub(r"\\[X\\]\\s*%\\s*improvement\\s+in\\s+\\[metric\\]", "", resume_text, flags=re.I)
+            resume_text = re.sub(r"\\s+([,.;:])", r"\\1", resume_text)
             # Build a consistent, recruiter-friendly DOCX instead of dumping every
             # extracted PDF line into unformatted paragraphs. Text is not invented.
             doc = Document()
