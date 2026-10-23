@@ -55,8 +55,15 @@ def _clean_extracted_resume_text(text: str) -> str:
         "groundn ess": "groundedness", "deploy ment": "deployment",
         "sou rce": "source", "ve ctor": "vector", "DevO ps": "DevOps",
         "wit h": "with", "Po wer BI": "Power BI", "tool -enabled": "tool-enabled",
-        "human -in-the- loop": "human-in-the-loop", "Hands -on": "Hands-on",
-        "source -aware": "source-aware", "Gurgaon , India": "Gurgaon, India",
+        "human -in-the- loop": "human-in-the-loop", "human -in-the-": "human-in-the-",
+        "Hands -on": "Hands-on", "source -aware": "source-aware",
+        "natural -language": "natural-language", "Azure -oriented": "Azure-oriented",
+        "multi -agent": "multi-agent", "tool -calling": "tool-calling",
+        "prompt -injection": "prompt-injection", "sensitive -information": "sensitive-information",
+        "production -oriented": "production-oriented", "Document Inte lligence": "Document Intelligence",
+        "groundedn ess": "groundedness", "gro undedness": "groundedness",
+        "integratio n": "integration", "vector/hybrid r": "vector/hybrid r",
+        "Gurgaon , India": "Gurgaon, India",
         "+91 -7015042204": "+91 7015042204",
         "linkedin.com/in/aman -sharma -0b113a136": "linkedin.com/in/aman-sharma-0b113a136",
     }
@@ -152,6 +159,7 @@ def _build_resume_docx(resume_text: str):
         if not clean_line:
             continue
         if clean_line.lower() in headings:
+            current_section = clean_line.lower()
             p = doc.add_paragraph()
             p.paragraph_format.space_before = Pt(6)
             p.paragraph_format.space_after = Pt(2)
