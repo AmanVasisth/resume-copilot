@@ -150,6 +150,7 @@ export default function Home(){
         <header>
           <div className="logo">CareerCoach <span>AI</span></div>
           <div className="header-actions">
+            <a className="history-button" href="/video-interview" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>🎥 Video mock interview</a>
             <button type="button" className="history-button" onClick={() => { setPlan(null); setReport(null); setFeedback(null); setShowHistory(true); loadHistory(); }}>Interview history</button>
             <button type="button" className="history-button" onClick={() => window.print()}>Print / Save PDF</button>
           </div>
