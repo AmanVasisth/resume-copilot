@@ -43,9 +43,177 @@ async def extract_resume(file: UploadFile = File(...)):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+def _clean_extracted_resume_text(text: str) -> str:
+    """Repair common PDF extraction splits while preserving the source wording."""
+    text = text.replace("\u00a0", " ")
+    fixes = {
+        "g mail.com": "gmail.com", "G mail.com": "gmail.com",
+        "Microsof t": "Microsoft", "Microsof t Azure": "Microsoft Azure",
+        "Develop ed": "Developed", "develop ed": "developed",
+        "cont rolled": "controlled", "app lication": "application",
+        "reason ing": "reasoning", "docume nt": "document",
+        "groundn ess": "groundedness", "deploy ment": "deployment",
+        "sou rce": "source", "ve ctor": "vector", "DevO ps": "DevOps",
+        "wit h": "with", "Po wer BI": "Power BI", "tool -enabled": "tool-enabled",
+        "human -in-the- loop": "human-in-the-loop", "Hands -on": "Hands-on",
+        "source -aware": "source-aware", "Gurgaon , India": "Gurgaon, India",
+        "+91 -7015042204": "+91 7015042204",
+        "linkedin.com/in/aman -sharma -0b113a136": "linkedin.com/in/aman-sharma-0b113a136",
+    }
+    for broken, fixed in fixes.items():
+        text = text.replace(broken, fixed)
+    text = re.sub(r"(?i)g\s+mail\.com", "gmail.com", text)
+    text = re.sub(r"(?i)microsof\s+t", "Microsoft", text)
+    text = re.sub(r"\[X\]\s*%\s*improvement\s+in\s+\[metric\]", "", text, flags=re.I)
+    text = re.sub(r"[ \t]+([,.;:])", r"\1", text)
+    text = re.sub(r" {2,}", " ", text)
+    # Join a line break only when the next line clearly continues the same sentence.
+    lines = [line.strip() for line in text.replace("\r", "").split("\n")]
+    joined = []
+    for line in lines:
+        if not line:
+            if joined and joined[-1] != "":
+                joined.append("")
+            continue
+        if joined and joined[-1] and not re.match(
+            r"^(?:PROFESSIONAL SUMMARY|PROFILE SUMMARY|SUMMARY|AI & TECHNICAL SKILLS|"
+            r"TECHNICAL SKILLS|SKILLS|PROFESSIONAL EXPERIENCE|WORK EXPERIENCE|"
+            r"EXPERIENCE|KEY AI PROJECTS|PROJECTS|AI ENGINEERING FOCUS|EDUCATION|"
+            r"CERTIFICATIONS|AWARDS|ACHIEVEMENTS)\s*$", line, re.I
+        ) and not re.match(r"^(?:[-•▪●]|\d+[.)]\s+|Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|GenAI|AI Engineer|Data Analyst)\b", line, re.I):
+            previous = joined[-1]
+            # PDF extraction often splits words with an internal space; repair known words above.
+            if previous.endswith(("-", "/")):
+                joined[-1] = previous + line
+            elif previous.endswith((".", "!", ":", ";")):
+                joined.append(line)
+            elif len(previous) < 95 and not previous.endswith((",", "|")):
+                joined[-1] = previous + " " + line
+            else:
+                joined.append(line)
+        else:
+            joined.append(line)
+    return "\n".join(line for line in joined if line).strip()
+
+
+def _build_resume_docx(resume_text: str):
+    doc = Document()
+    section = doc.sections[0]
+    section.top_margin = Inches(0.42)
+    section.bottom_margin = Inches(0.42)
+    section.left_margin = Inches(0.58)
+    section.right_margin = Inches(0.58)
+    normal = doc.styles["Normal"]
+    normal.font.name = "Arial"
+    normal.font.size = Pt(8.5)
+    normal.font.color.rgb = RGBColor(38, 48, 65)
+    normal.paragraph_format.space_after = Pt(1.5)
+    normal.paragraph_format.line_spacing = 1.0
+
+    headings = {
+        "professional summary", "profile summary", "summary", "experience",
+        "professional experience", "work experience", "projects", "key projects",
+        "key ai projects", "ai & technical skills", "technical skills", "skills",
+        "core competencies", "education", "certifications", "awards", "achievements",
+        "key result areas", "ai engineering focus",
+    }
+    raw_lines = [line.strip() for line in resume_text.splitlines() if line.strip()]
+    if not raw_lines:
+        raise ValueError("No readable resume text found.")
+
+    title = doc.add_paragraph()
+    title.alignment = 1
+    title.paragraph_format.space_after = Pt(1)
+    run = title.add_run(raw_lines[0])
+    run.bold = True
+    run.font.name = "Arial"
+    run.font.size = Pt(18)
+    run.font.color.rgb = RGBColor(37, 49, 78)
+
+    idx = 1
+    if idx < len(raw_lines) and (
+        "@" in raw_lines[idx] or "linkedin.com" in raw_lines[idx].lower()
+        or re.search(r"\+?\d[\d ()-]{7,}", raw_lines[idx])
+    ):
+        contact = doc.add_paragraph()
+        contact.alignment = 1
+        contact.paragraph_format.space_after = Pt(5)
+        cr = contact.add_run(raw_lines[idx])
+        cr.font.size = Pt(8)
+        cr.font.color.rgb = RGBColor(90, 99, 115)
+        idx += 1
+
+    skill_categories = (
+        "Agentic AI", "LLMs", "RAG & Retrieval", "AI Evaluation & Guardrails",
+        "Azure AI", "Python & Backend", "Cloud / DevOps", "Data & Analytics",
+    )
+    for line in raw_lines[idx:]:
+        clean_line = re.sub(r"^[•▪●]\s*", "", line).strip()
+        if not clean_line:
+            continue
+        if clean_line.lower() in headings:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(6)
+            p.paragraph_format.space_after = Pt(2)
+            p.paragraph_format.keep_with_next = True
+            r = p.add_run(clean_line.upper())
+            r.bold = True
+            r.font.name = "Arial"
+            r.font.size = Pt(10)
+            r.font.color.rgb = RGBColor(79, 70, 229)
+            continue
+
+        # Skill rows: separate known category labels from their values when possible.
+        matched_skill = next((label for label in skill_categories if clean_line.startswith(label + " ")), None)
+        if matched_skill:
+            value = clean_line[len(matched_skill):].strip(" :-|")
+            table = doc.add_table(rows=1, cols=2)
+            table.autofit = False
+            table.columns[0].width = Inches(1.62)
+            table.columns[1].width = Inches(5.45)
+            left, right = table.rows[0].cells
+            left.width, right.width = Inches(1.62), Inches(5.45)
+            left.text, right.text = matched_skill, value
+            for run in left.paragraphs[0].runs:
+                run.bold = True
+                run.font.size = Pt(8)
+                run.font.color.rgb = RGBColor(37, 49, 78)
+            for cell in (left, right):
+                for p in cell.paragraphs:
+                    p.paragraph_format.space_after = Pt(0)
+                    for run in p.runs:
+                        run.font.name = "Arial"
+                        run.font.size = Pt(8)
+            continue
+
+        is_role = bool(re.match(
+            r"^(Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|"
+            r"GenAI|AI Engineer|Data Analyst).{0,180}\|", clean_line, re.I
+        ))
+        is_project = bool(re.match(r"^(?:\d+[.)]\s+)?(?:ANZ|Control Tower|SOFAC|Shipping|"
+                                   r"Vessel|Conversational|RAG|Agentic|AI[- ]powered)", clean_line, re.I))
+        is_bullet = bool(re.match(r"^[-•▪●]\s*", line))
+        p = doc.add_paragraph()
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_after = Pt(1.5)
+        if is_role or is_project:
+            p.paragraph_format.space_before = Pt(3)
+            p.paragraph_format.keep_with_next = True
+            r = p.add_run(clean_line)
+            r.bold = True
+            r.font.color.rgb = RGBColor(37, 49, 78)
+        elif is_bullet:
+            p.paragraph_format.left_indent = Inches(0.16)
+            p.paragraph_format.first_line_indent = Inches(-0.12)
+            p.add_run("• " + re.sub(r"^[-•▪●]\s*", "", line))
+        else:
+            p.add_run(clean_line)
+    return doc
+
+
 @app.post("/v1/resume/export")
 async def export_revised_resume(file: UploadFile = File(...), approved_bullets: str = ""):
-    """Export approved edits to a polished, editable DOCX resume."""
+    """Export approved resume edits as an editable, consistently styled DOCX."""
     try:
         content = await file.read()
         ext = Path(file.filename or "").suffix.lower()
@@ -72,92 +240,14 @@ async def export_revised_resume(file: UploadFile = File(...), approved_bullets: 
         else:
             resume_text = extract_resume_text(file.filename or "", content)
             if not resume_text.strip():
-                raise ValueError("No readable resume text found.")
+                raise ValueError("No readable text found in the uploaded resume.")
             for item in replacements:
                 original = str(item.get("original", "")).strip()
                 replacement = str(item.get("replacement", "")).strip()
                 if original and replacement:
                     resume_text = resume_text.replace(original, replacement, 1)
-
-            # Repair frequent PDF text-extraction artefacts without adding claims.
-            resume_text = re.sub(r"(?i)g\\s+mail\\.com", "gmail.com", resume_text)
-            resume_text = re.sub(r"(?i)Microsof\\s+t", "Microsoft", resume_text)
-            for broken, fixed in {
-                "Develop ed": "Developed", "develop ed": "developed",
-                "cont rolled": "controlled", "app lication": "application",
-                "reason ing": "reasoning", "docume nt": "document",
-                "groundn ess": "groundedness", "deploy ment": "deployment",
-                "sou rce": "source", "ve ctor": "vector", "Microsof t": "Microsoft",
-                "DevO ps": "DevOps", "wit h": "with", "Po wer BI": "Power BI",
-            }.items():
-                resume_text = resume_text.replace(broken, fixed)
-            resume_text = re.sub(r"\\[X\\]\\s*%\\s*improvement\\s+in\\s+\\[metric\\]", "", resume_text, flags=re.I)
-            resume_text = re.sub(r"\\s+([,.;:])", r"\\1", resume_text)
-            # Build a consistent, recruiter-friendly DOCX instead of dumping every
-            # extracted PDF line into unformatted paragraphs. Text is not invented.
-            doc = Document()
-            section = doc.sections[0]
-            section.top_margin = Inches(0.48)
-            section.bottom_margin = Inches(0.48)
-            section.left_margin = Inches(0.62)
-            section.right_margin = Inches(0.62)
-
-            styles = doc.styles
-            normal = styles["Normal"]
-            normal.font.name = "Arial"
-            normal.font.size = Pt(9)
-            normal.font.color.rgb = RGBColor(38, 48, 65)
-            normal.paragraph_format.space_after = Pt(2)
-            normal.paragraph_format.line_spacing = 1.05
-
-            heading_names = {
-                "professional summary", "profile summary", "summary",
-                "experience", "professional experience", "work experience",
-                "projects", "key projects", "technical skills", "skills",
-                "core competencies", "education", "certifications", "awards",
-                "achievements", "key result areas"
-            }
-            lines = [re.sub(r"^\s*[•▪●]\s*", "", line).strip()
-                     for line in resume_text.splitlines()]
-            lines = [line for line in lines if line]
-            if not lines:
-                raise ValueError("No readable resume text found.")
-
-            # Name and contact line are highlighted, while the original wording
-            # and sequence are retained as far as text extraction allows.
-            title = doc.add_paragraph()
-            title.paragraph_format.space_after = Pt(2)
-            title_run = title.add_run(lines[0])
-            title_run.bold = True
-            title_run.font.name = "Arial"
-            title_run.font.size = Pt(19)
-            title_run.font.color.rgb = RGBColor(37, 49, 78)
-
-            for line in lines[1:]:
-                if line.lower() in heading_names:
-                    p = doc.add_paragraph()
-                    p.paragraph_format.space_before = Pt(7)
-                    p.paragraph_format.space_after = Pt(3)
-                    run = p.add_run(line.upper())
-                    run.bold = True
-                    run.font.name = "Arial"
-                    run.font.size = Pt(10.5)
-                    run.font.color.rgb = RGBColor(79, 70, 229)
-                elif re.match(r"^(Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|GenAI|AI Engineer|Data Analyst).{0,180}\|\s*", line, re.I):
-                    p = doc.add_paragraph()
-                    p.paragraph_format.space_before = Pt(4)
-                    p.paragraph_format.keep_with_next = True
-                    run = p.add_run(line)
-                    run.bold = True
-                    run.font.color.rgb = RGBColor(37, 49, 78)
-                else:
-                    p = doc.add_paragraph()
-                    p.paragraph_format.keep_together = True
-                    if line.startswith(("-", "•", "▪", "●")):
-                        p.paragraph_format.left_indent = Inches(0.16)
-                        p.add_run("• " + line.lstrip("-•▪● "))
-                    else:
-                        p.add_run(line)
+            resume_text = _clean_extracted_resume_text(resume_text)
+            doc = _build_resume_docx(resume_text)
 
         stream = BytesIO()
         doc.save(stream)
