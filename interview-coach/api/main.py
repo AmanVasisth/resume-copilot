@@ -129,7 +129,7 @@ def _build_resume_docx(resume_text: str):
         idx += 1
     current_section = ""
     for line in raw_lines[idx:]:
-        clean_line = re.sub(r"^[-•▪●]\\s*", "", line).strip()
+        clean_line = re.sub(r"^[-•▪●]\s*", "", line).strip()
         if clean_line.lower() in headings:
             current_section = clean_line.lower()
             p = doc.add_paragraph()
@@ -163,9 +163,9 @@ def _build_resume_docx(resume_text: str):
                         run.font.name = "Arial"
                         run.font.size = Pt(7.75)
             continue
-        is_role = bool(re.match(r"^(Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|GenAI|AI Engineer|Data Analyst).{0,180}\\|", clean_line, re.I))
-        is_project = bool(re.match(r"^(?:\\d+[.)]\\s+)?(?:ANZ|Control Tower|SOFAC|Shipping|Vessel|Conversational|RAG|Agentic|AI[- ]powered)", clean_line, re.I))
-        is_bullet = bool(re.match(r"^[-•▪●]\\s*", line))
+        is_role = bool(re.match(r"^(Qlik Sense Developer|Senior Consultant|Consultant|Power BI Developer|GenAI|AI Engineer|Data Analyst).{0,180}\|", clean_line, re.I))
+        is_project = bool(re.match(r"^(?:\d+[.)]\s+)?(?:ANZ|Control Tower|SOFAC|Shipping|Vessel|Conversational|RAG|Agentic|AI[- ]powered)", clean_line, re.I))
+        is_bullet = bool(re.match(r"^[-•▪●]\s*", line))
         p = doc.add_paragraph()
         p.paragraph_format.keep_together = True
         p.paragraph_format.space_after = Pt(1)
@@ -178,7 +178,7 @@ def _build_resume_docx(resume_text: str):
         elif is_bullet or current_section in {"experience", "professional experience", "work experience", "projects", "key projects", "key ai projects", "ai engineering focus"}:
             p.paragraph_format.left_indent = Inches(0.16)
             p.paragraph_format.first_line_indent = Inches(-0.12)
-            p.add_run("• " + clean_line)
+            p.add_run("• " + re.sub(r"^[-•▪●]\s*", "", clean_line))
         else:
             p.add_run(clean_line)
     return doc
